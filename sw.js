@@ -1,7 +1,7 @@
 // غيّر رقم النسخة عند كل تحديث للتطبيق حتى يتم تحميل النسخة الجديدة فورًا
 const CACHE_NAME = 'quota-calc-v1';
 const FILES_TO_CACHE = [
-  './quota-calculator.html',
+  './index.html',
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
