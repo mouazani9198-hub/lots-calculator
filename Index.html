@@ -4,6 +4,17 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>حاسبة الحصص</title>
+
+<!-- PWA: manifest + ثيم + أيقونات -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#0a1d30">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="حاسبة الحصص">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
 <style>
 :root{
   --navy:#0f2942; --navy-deep:#0a1d30; --steel:#2c4a63; --milk:#f4f6f0;
@@ -925,6 +936,15 @@ renderFileSelect();
 if(currentFileId && getFile(currentFileId)){
   document.getElementById('fileSelect').value = currentFileId;
   renderWorkspace();
+}
+
+// ----- تسجيل Service Worker (للعمل بدون إنترنت) -----
+if('serviceWorker' in navigator){
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      console.warn('SW registration failed:', err);
+    });
+  });
 }
 </script>
 </body>
