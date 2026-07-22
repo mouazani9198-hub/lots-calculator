@@ -294,6 +294,14 @@ function palletWeight(file){
   return roundTo3((bags * w) / 1000);
 }
 
+function remainingForDelivery(file){
+  const deliveredElsewhere = parseFloat(file.deliveredElsewhere) || 0;
+  const deliveredHere = (file.deliveries || [])
+    .filter(d => d.completedAt)
+    .reduce((sum, d) => sum + (parseFloat(d.targetTons) || 0), 0);
+  return Math.max(0, roundTo3((parseFloat(file.contractedQty)||0) - deliveredElsewhere - deliveredHere));
+}
+
 function targetPalletsReceiving(file){
   if(file.totalPallets && file.totalPallets > 0) return Math.round(file.totalPallets);
   if(file.totalBags && file.bagsPerPallet) return Math.ceil(file.totalBags / file.bagsPerPallet);
@@ -618,6 +626,7 @@ function renderFileInfo(){
     file.shipName ? `الباخرة: <b>${file.shipName}</b>${file.arrivalDate ? ' · وصول: <b>'+file.arrivalDate+'</b>' : ''}` : '',
     file.prodDate ? `تاريخ الإنتاج: <b>${file.prodDate}</b>${file.expiryDate ? ' · الصلاحية حتى: <b>'+file.expiryDate+'</b>' : ''}` : '',
     `الكمية المتعاقد عليها: <b>${formatTons(file.contractedQty)}</b> طن`,
+    `الكمية المتبقية المتاحة للتسليم: <b>${formatTons(remainingForDelivery(file))}</b> طن`,
     `عدد الأكياس: <b>${file.totalBags||'—'}</b> · عدد المنصات: <b>${targetR || '—'}</b> (${file.bagsPerPallet} كيس/منصة × ${file.bagWeight} كغ = ${formatTons(pw)} طن/منصة)`,
     (file.lotsCount || (file.expectedLots||[]).length) ? `عدد الحصص: <b>${file.lotsCount || (file.expectedLots||[]).length}</b>${(file.expectedLots||[]).length ? ' — أرقامها: <b>'+file.expectedLots.join(', ')+'</b>' : ''}` : ''
   ].filter(Boolean);
@@ -729,6 +738,7 @@ function importFromMilkApp(event){
             existing.contractedQty = d.initialQty || existing.contractedQty;
             existing.bagsPerPallet = d.bagsPerPallet || existing.bagsPerPallet;
             existing.lotsCount = d.lotsCount || existing.lotsCount;
+            existing.deliveredElsewhere = (typeof d.delivered === 'number') ? d.delivered : (existing.deliveredElsewhere || 0);
             if(expectedLots.length) existing.expectedLots = expectedLots;
             updated++;
           } else {
@@ -737,6 +747,7 @@ function importFromMilkApp(event){
               prodDate: d.prodDate || '', expiryDate: d.expiry || '',
               contractNumber: d.contractNumber || '', shipName: d.shipName || '',
               arrivalDate: d.arrivalDate || '', contractedQty: d.initialQty || 0,
+              deliveredElsewhere: (typeof d.delivered === 'number') ? d.delivered : 0,
               totalBags: 0, totalPallets: 0, bagsPerPallet: d.bagsPerPallet || 0, bagWeight: 25,
               lotsCount: d.lotsCount || '', expectedLots,
               receiving: { entries: [] }, deliveries: [], importedFromMilkApp: true
