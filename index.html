@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>حاسبة الحصص</title>
+<style>
+:root{
+  --navy:#0f2942; --navy-deep:#0a1d30; --steel:#2c4a63; --milk:#f4f6f0;
+  --accent:#2f8fd4; --accent-dim:#1c5d85; --amber:#dba53e; --amber-dim:#8a5606;
+  --green:#33b56c; --green-dim:#1f7a49; --danger:#c0553f;
+  --text-soft:#c7d2dc; --glass-tint: rgba(47,143,212,0.10); --glass-border: rgba(130,190,235,0.20);
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{margin:0;min-height:100%;background:var(--navy-deep);
+  background-image:radial-gradient(circle at 50% -10%, var(--steel) 0%, var(--navy-deep) 65%);
+  font-family:'Segoe UI',Tahoma,Arial,sans-serif;color:var(--milk);padding:14px;}
+.wrap{max-width:480px;margin:0 auto;}
+header{text-align:center;padding:6px 0 16px;}
+header .badge{display:inline-block;background:var(--accent-dim);color:var(--milk);font-size:11px;letter-spacing:2px;padding:4px 12px;border-radius:20px;margin-bottom:8px;}
+header h1{font-size:19px;margin:0;font-weight:700;}
+header p{margin:4px 0 0;font-size:12px;color:var(--text-soft);}
+.card{background:linear-gradient(rgba(8,16,26,0.55),rgba(8,16,26,0.55)),var(--glass-tint);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border-radius:18px;padding:16px;margin-bottom:14px;
+  box-shadow:0 10px 28px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05);border:1px solid var(--glass-border);}
+.card h2{font-size:12px;letter-spacing:1px;color:var(--text-soft);margin:0 0 12px;text-transform:uppercase;display:flex;align-items:center;gap:6px;}
+.card h2::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--accent);display:inline-block;}
+label{display:block;font-size:11px;color:var(--text-soft);margin-bottom:4px;}
+input,select,textarea{width:100%;background:var(--navy-deep);border:1px solid rgba(255,255,255,0.15);
+  color:var(--milk);border-radius:8px;padding:10px;font-size:14px;font-family:inherit;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--accent);}
+.row{display:flex;gap:8px;}
+.row > *{flex:1;}
+.field{margin-bottom:10px;}
+.btn-primary{background:linear-gradient(180deg,var(--accent),var(--accent-dim));color:#fff;border:none;
+  border-radius:10px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;width:100%;}
+.btn-secondary{background:rgba(255,255,255,0.06);color:var(--milk);border:1px solid var(--glass-border);
+  border-radius:10px;padding:11px;font-size:13px;font-weight:600;cursor:pointer;width:100%;}
+.btn-danger{background:rgba(192,85,63,0.18);color:#ffb3a1;border:1px solid var(--danger);
+  border-radius:10px;padding:10px;font-size:12.5px;font-weight:600;cursor:pointer;}
+.btn-small{padding:8px 10px;font-size:12px;width:auto;flex:0 0 auto;}
+.tabs{display:flex;gap:8px;margin-bottom:14px;}
+.tab-btn{flex:1;padding:10px;border-radius:10px;border:1px solid var(--glass-border);background:rgba(255,255,255,0.04);
+  color:var(--text-soft);font-weight:700;font-size:13px;cursor:pointer;}
+.tab-btn.active{background:var(--accent-dim);color:#fff;border-color:var(--accent);}
+.tab-btn.active.delivery-active{background:var(--amber-dim);border-color:var(--amber);}
+.chip{display:inline-flex;align-items:center;background:rgba(255,255,255,0.07);border:1px solid var(--glass-border);
+  color:var(--milk);border-radius:16px;padding:6px 12px;font-size:13px;margin:3px;cursor:pointer;font-family:'Consolas','Courier New',monospace;}
+.chip:active{transform:scale(0.95);}
+.chip.suggest{background:rgba(219,165,62,0.18);border-color:var(--amber);color:#ffe1a8;}
+.chips{display:flex;flex-wrap:wrap;margin-top:8px;min-height:6px;}
+.chips-label{font-size:10.5px;color:var(--text-soft);margin-top:8px;}
+.gauge-row{display:flex;align-items:center;justify-content:space-between;gap:6px;margin:10px 0 6px;}
+.gauge-box{flex:1;text-align:center;}
+.ring{width:104px;height:104px;border-radius:50%;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;
+  transition:background 0.3s ease;}
+.ring-inner{width:82px;height:82px;border-radius:50%;background:var(--navy-deep);display:flex;flex-direction:column;
+  align-items:center;justify-content:center;box-shadow:inset 0 0 0 1px rgba(255,255,255,0.06);}
+.ring-inner .num{font-size:20px;font-weight:800;direction:ltr;color:var(--milk);}
+.ring-inner .unit{font-size:9px;color:var(--text-soft);margin-top:1px;}
+.gauge-box .cap{font-size:11px;color:var(--text-soft);margin-top:2px;}
+.center-btn{width:66px;height:66px;border-radius:50%;border:none;flex:0 0 auto;
+  background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.35), transparent 55%), linear-gradient(180deg,var(--green),var(--green-dim));
+  color:#fff;font-size:30px;font-weight:800;cursor:pointer;box-shadow:0 6px 18px rgba(0,0,0,0.45), 0 0 0 4px rgba(51,181,108,0.18);
+  display:flex;align-items:center;justify-content:center;line-height:1;padding-bottom:4px;}
+.center-btn.delivery{background:radial-gradient(circle at 35% 30%, rgba(255,255,255,0.35), transparent 55%), linear-gradient(180deg,var(--amber),var(--amber-dim));
+  box-shadow:0 6px 18px rgba(0,0,0,0.45), 0 0 0 4px rgba(219,165,62,0.18);}
+.center-btn:active{transform:scale(0.92);}
+.center-btn:disabled{opacity:0.35;cursor:not-allowed;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th,td{border:1px solid var(--glass-border);padding:8px 6px;text-align:center;}
+thead th{background:var(--accent-dim);color:#fff;font-weight:800;font-size:11.5px;}
+tbody tr:nth-child(even){background:rgba(255,255,255,0.03);}
+.empty-note{text-align:center;font-size:12.5px;color:var(--text-soft);padding:16px 0;}
+.info-line{font-size:11.5px;color:var(--text-soft);line-height:1.9;margin-bottom:4px;}
+.info-line b{color:var(--milk);}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--accent);
+  color:#06210f;font-weight:700;font-size:13px;padding:12px 20px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,0.4);
+  opacity:0;pointer-events:none;transition:opacity 0.25s ease, transform 0.25s ease;z-index:1100;max-width:90%;text-align:center;}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+.modal-overlay{position:fixed;inset:0;background:rgba(5,10,18,0.72);z-index:1000;display:flex;align-items:center;justify-content:center;padding:16px;}
+.modal-box{background:linear-gradient(rgba(10,20,32,0.98),rgba(10,20,32,0.98));border:1px solid var(--glass-border);
+  border-radius:16px;padding:18px;width:100%;max-width:380px;box-shadow:0 20px 50px rgba(0,0,0,0.5);}
+.modal-box h3{margin:0 0 12px;font-size:15px;}
+.modal-actions{display:flex;gap:8px;margin-top:14px;}
+#lotInput{font-size:22px;text-align:center;font-family:'Consolas','Courier New',monospace;letter-spacing:1px;}
+.confirm-box{background:linear-gradient(rgba(10,20,32,0.98),rgba(10,20,32,0.98));border:1px solid var(--danger);
+  border-radius:16px;padding:18px;width:100%;max-width:380px;}
+.confirm-box p{font-size:13.5px;line-height:1.8;white-space:pre-line;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="badge">STOCK · حصص</span>
+    <h1>🧮 حاسبة الحصص</h1>
+    <p>عداد استلام وتسليم المنصات حسب رقم الحصة</p>
+  </header>
+
+  <div class="card" id="filesCard">
+    <h2>📁 ملفات الشحنات</h2>
+    <div class="field">
+      <label>اختر ملفاً للعمل عليه</label>
+      <select id="fileSelect" onchange="onFileSelect()">
+        <option value="">— اختر ملفاً —</option>
+      </select>
+    </div>
+    <button class="btn-secondary" onclick="toggleNewFileForm()">➕ تسجيل ملف شحنة جديد <span id="newFileArrow">▾</span></button>
+
+    <div id="newFileForm" style="display:none;margin-top:12px;">
+      <div class="field">
+        <label>نوع البودرة</label>
+        <select id="nfPowderType">
+          <option value="0%">0% دسم</option>
+          <option value="26%">26% دسم</option>
+        </select>
+      </div>
+      <div class="field"><label>رقم الملف</label><input type="text" id="nfFileNumber" placeholder="رقم الملف / BL"></div>
+      <div class="row">
+        <div class="field"><label>تاريخ الإنتاج</label><input type="date" id="nfProdDate"></div>
+        <div class="field"><label>تاريخ نهاية الصلاحية</label><input type="date" id="nfExpiryDate"></div>
+      </div>
+      <div class="field"><label>رقم العقد</label><input type="text" id="nfContract" placeholder="رقم العقد"></div>
+      <div class="row">
+        <div class="field"><label>اسم الباخرة</label><input type="text" id="nfShip" placeholder="اسم الباخرة"></div>
+        <div class="field"><label>تاريخ وصول الباخرة</label><input type="date" id="nfArrival"></div>
+      </div>
+      <div class="field"><label>الكمية المتعاقد عليها (طن)</label><input type="number" id="nfContractedQty" min="0" step="0.001" placeholder="مثال: 504.000"></div>
+      <div class="row">
+        <div class="field"><label>عدد الأكياس الإجمالي</label><input type="number" id="nfTotalBags" min="0" placeholder="عدد الأكياس"></div>
+        <div class="field"><label>عدد المنصات الإجمالي</label><input type="number" id="nfTotalPallets" min="0" placeholder="اتركه فارغاً للحساب تلقائياً"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>عدد الأكياس في المنصة</label><input type="number" id="nfBagsPerPallet" min="1" placeholder="مثال: 56"></div>
+        <div class="field"><label>وزن الكيس (كغ)</label><input type="number" id="nfBagWeight" min="0" step="0.1" value="25"></div>
+      </div>
+      <div class="field"><label>عدد الحصص</label><input type="number" id="nfLotsCount" min="0" placeholder="عدد الحصص المتوقعة"></div>
+      <div class="field"><label>أرقام الحصص (مفصولة بفاصلة)</label><input type="text" id="nfLotsNumbers" placeholder="مثال: 101,102,103"></div>
+      <button class="btn-primary" onclick="createNewFile()">💾 حفظ الملف</button>
+    </div>
+  </div>
+
+  <div class="card" id="linkCard">
+    <h2>🔗 الربط بحاسبة الحليب ودمج التقارير</h2>
+
+    <div style="margin-bottom:14px;">
+      <label>📥 استيراد الملفات المسجَّلة من حاسبة الحليب</label>
+      <div class="info-line" style="margin-bottom:6px;">ارفع ملف النسخة الاحتياطية (JSON) الذي يصدّره تطبيق "حاسبة الحليب" — سيتم إنشاء/تحديث بيانات الملفات هنا دون المساس بعمليات الاستلام والتسليم المسجَّلة مسبقاً في هذا التطبيق.</div>
+      <input type="file" id="importMilkInput" accept=".json" onchange="importFromMilkApp(event)">
+    </div>
+
+    <div style="margin-bottom:14px;">
+      <label>🧩 دمج تقارير الحصص من عدة أجهزة (مسيرة المخازن)</label>
+      <div class="info-line" style="margin-bottom:6px;">ارفع عدة ملفات Excel مُصدَّرة من هذا التطبيق (من أجهزة/موظفين مختلفين) — سيتم قراءتها واستخراج ملف Excel جامع واحد فقط، دون أي تعديل على البيانات المخزَّنة محلياً في هذا الجهاز.</div>
+      <input type="file" id="mergeLotsInput" accept=".xlsx" multiple onchange="mergeLotsReports(event)">
+      <div id="mergeResult" style="margin-top:8px;font-size:12px;"></div>
+    </div>
+
+    <div>
+      <label>🧪 محاكاة تجريبية شاملة</label>
+      <div class="info-line" style="margin-bottom:6px;">ينشئ ملفاً تجريبياً منفصلاً ويشغّل تلقائياً عملية استلام كاملة وعمليتَي تسليم لزبونين وهميين، لاختبار سير العمل كاملاً (العدادات، الاقتراحات، التصدير) دون أي تأثير على ملفاتك الحقيقية.</div>
+      <div class="row">
+        <button class="btn-secondary" onclick="runFullSimulation()">▶️ تشغيل محاكاة جديدة</button>
+        <button class="btn-danger" onclick="deleteAllSimulations()">🗑️ حذف كل ملفات المحاكاة</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="workspace" style="display:none;">
+    <div class="card" id="fileInfoCard">
+      <h2>📦 بيانات الملف النشط</h2>
+      <div id="fileInfoLines"></div>
+      <button class="btn-danger" style="width:100%;margin-top:8px;" onclick="deleteCurrentFile()">🗑️ حذف هذا الملف نهائياً</button>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button id="tabReceiving" class="tab-btn active" onclick="switchMode('receiving')">📥 استلام</button>
+        <button id="tabDelivery" class="tab-btn" onclick="switchMode('delivery')">📤 تسليم</button>
+      </div>
+
+      <div id="deliverySetup" style="display:none;margin-bottom:14px;">
+        <div class="field">
+          <label>عملية تسليم جارية</label>
+          <select id="deliverySelect" onchange="onDeliverySelect()"></select>
+        </div>
+        <div id="newDeliveryForm">
+          <div class="field"><label>اسم الزبون (اختياري)</label><input type="text" id="ndCustomer" placeholder="اسم الزبون"></div>
+          <div class="row">
+            <div class="field"><label>الكمية المطلوبة (طن)</label><input type="number" id="ndTargetTons" min="0" step="0.001" placeholder="بالطن"></div>
+            <div class="field"><label>أو عدد المنصات</label><input type="number" id="ndTargetPallets" min="0" placeholder="عدد المنصات"></div>
+          </div>
+          <button class="btn-primary" onclick="startNewDelivery()">🚚 بدء عملية تسليم جديدة</button>
+        </div>
+      </div>
+
+      <div id="counterArea" style="display:none;">
+        <div class="gauge-row">
+          <div class="gauge-box">
+            <div class="ring" id="ringRemaining"><div class="ring-inner"><div class="num" id="numRemaining">0</div><div class="unit">منصة</div></div></div>
+            <div class="cap">المتبقي (<span id="tonsRemaining">0</span> طن)</div>
+          </div>
+          <button id="centerBtn" class="center-btn" onclick="openLotModal()">＋</button>
+          <div class="gauge-box">
+            <div class="ring" id="ringFilled"><div class="ring-inner"><div class="num" id="numFilled">0</div><div class="unit">منصة</div></div></div>
+            <div class="cap">المسجَّل (<span id="tonsFilled">0</span> طن)</div>
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="undoLast()">↩️ تراجع عن آخر تسجيل</button>
+      </div>
+      <div id="noTargetNote" class="empty-note" style="display:none;">⚠️ أدخل عدد الأكياس/المنصة والكمية أو عدد المنصات في بيانات الملف لتفعيل العداد</div>
+    </div>
+
+    <div class="card">
+      <h2>📊 تفصيل الحصص المسجَّلة</h2>
+      <div id="tallyWrap"><table id="tallyTable"><thead><tr><th>رقم الحصة</th><th>عدد المنصات</th><th>الوزن (طن)</th></tr></thead><tbody id="tallyBody"></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <button class="btn-primary" onclick="exportExcel()">⬇️ تصدير Excel لهذا الملف</button>
+    </div>
+  </div>
+</div>
+
+<div id="lotModalOverlay" class="modal-overlay" style="display:none;">
+  <div class="modal-box">
+    <h3>📦 تسجيل رقم الحصة لهذه المنصة</h3>
+    <input type="text" id="lotInput" inputmode="numeric" placeholder="رقم الحصة" oninput="onLotInput()" autofocus>
+    <div id="expectedChipsWrap" style="display:none;">
+      <div class="chips-label">أرقام الحصص المتوقعة لهذا الملف</div>
+      <div class="chips" id="expectedChips"></div>
+    </div>
+    <div id="suggestChipsWrap" style="display:none;">
+      <div class="chips-label">🔁 هذا الرقم مكرر كثيراً — اختر منها مباشرة</div>
+      <div class="chips" id="suggestChips"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeLotModal()">إلغاء</button>
+      <button class="btn-primary" onclick="confirmLotEntry()">تسجيل ✅</button>
+    </div>
+  </div>
+</div>
+
+<div id="confirmOverlay" class="modal-overlay" style="display:none;">
+  <div class="confirm-box">
+    <p id="confirmText"></p>
+    <div class="modal-actions">
+      <button class="btn-secondary" onclick="closeConfirm()">إلغاء</button>
+      <button class="btn-danger" style="flex:1;" onclick="runConfirmedAction()">تأكيد</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const FILES_KEY = 'lots_calc_files_v1';
+const LAST_FILE_KEY = 'lots_calc_last_file_v1';
+
+function loadFiles(){ try{ return JSON.parse(localStorage.getItem(FILES_KEY)) || []; }catch(e){ return []; } }
+function saveFiles(list){ localStorage.setItem(FILES_KEY, JSON.stringify(list)); }
+function genId(){ return 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
+function roundTo3(v){ return Math.round((parseFloat(v)||0)*1000)/1000; }
+function formatTons(v){ return roundTo3(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3}); }
+
+let currentFileId = localStorage.getItem(LAST_FILE_KEY) || '';
+let currentMode = 'receiving'; // 'receiving' | 'delivery'
+let currentDeliveryId = '';
+let pendingConfirmAction = null;
+
+function getFile(id){ return loadFiles().find(f => f.id === id); }
+function updateFile(id, mutator){
+  const list = loadFiles();
+  const idx = list.findIndex(f => f.id === id);
+  if(idx === -1) return;
+  mutator(list[idx]);
+  saveFiles(list);
+}
+
+function palletWeight(file){
+  const bags = parseFloat(file.bagsPerPallet) || 0;
+  const w = parseFloat(file.bagWeight) || 0;
+  return roundTo3((bags * w) / 1000);
+}
+
+function targetPalletsReceiving(file){
+  if(file.totalPallets && file.totalPallets > 0) return Math.round(file.totalPallets);
+  if(file.totalBags && file.bagsPerPallet) return Math.ceil(file.totalBags / file.bagsPerPallet);
+  const pw = palletWeight(file);
+  if(file.contractedQty && pw > 0) return Math.round(file.contractedQty / pw);
+  return 0;
+}
+
+function renderFileSelect(){
+  const sel = document.getElementById('fileSelect');
+  const list = loadFiles();
+  sel.innerHTML = '<option value="">— اختر ملفاً —</option>' +
+    list.map(f => `<option value="${f.id}">${f.fileNumber || '(بدون رقم)'} · ${f.powderType}${f.shipName ? ' · '+f.shipName : ''}</option>`).join('');
+  sel.value = currentFileId && getFile(currentFileId) ? currentFileId : '';
+}
+
+function toggleNewFileForm(){
+  const el = document.getElementById('newFileForm');
+  const arrow = document.getElementById('newFileArrow');
+  const showing = el.style.display !== 'none';
+  el.style.display = showing ? 'none' : 'block';
+  arrow.textContent = showing ? '▾' : '▴';
+}
+
+function createNewFile(){
+  const fileNumber = document.getElementById('nfFileNumber').value.trim();
+  const bagsPerPallet = parseFloat(document.getElementById('nfBagsPerPallet').value);
+  if(!fileNumber){ showToast('⚠️ أدخل رقم الملف'); return; }
+  if(!(bagsPerPallet > 0)){ showToast('⚠️ أدخل عدد الأكياس في المنصة'); return; }
+  const lotsNumbersRaw = document.getElementById('nfLotsNumbers').value.trim();
+  const expectedLots = lotsNumbersRaw ? lotsNumbersRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const file = {
+    id: genId(),
+    powderType: document.getElementById('nfPowderType').value,
+    fileNumber,
+    prodDate: document.getElementById('nfProdDate').value,
+    expiryDate: document.getElementById('nfExpiryDate').value,
+    contractNumber: document.getElementById('nfContract').value.trim(),
+    shipName: document.getElementById('nfShip').value.trim(),
+    arrivalDate: document.getElementById('nfArrival').value,
+    contractedQty: parseFloat(document.getElementById('nfContractedQty').value) || 0,
+    totalBags: parseFloat(document.getElementById('nfTotalBags').value) || 0,
+    totalPallets: parseFloat(document.getElementById('nfTotalPallets').value) || 0,
+    bagsPerPallet,
+    bagWeight: parseFloat(document.getElementById('nfBagWeight').value) || 25,
+    lotsCount: document.getElementById('nfLotsCount').value.trim(),
+    expectedLots,
+    receiving: { entries: [] },
+    deliveries: []
+  };
+  const list = loadFiles();
+  list.push(file);
+  saveFiles(list);
+  currentFileId = file.id;
+  localStorage.setItem(LAST_FILE_KEY, currentFileId);
+  ['nfFileNumber','nfProdDate','nfExpiryDate','nfContract','nfShip','nfArrival','nfContractedQty','nfTotalBags','nfTotalPallets','nfBagsPerPallet','nfLotsCount','nfLotsNumbers']
+    .forEach(id => document.getElementById(id).value = '');
+  document.getElementById('nfBagWeight').value = 25;
+  toggleNewFileForm();
+  renderFileSelect();
+  document.getElementById('fileSelect').value = currentFileId;
+  currentMode = 'receiving';
+  renderWorkspace();
+  showToast('📦 تم إنشاء الملف بنجاح');
+}
+
+function onFileSelect(){
+  currentFileId = document.getElementById('fileSelect').value;
+  localStorage.setItem(LAST_FILE_KEY, currentFileId);
+  currentMode = 'receiving';
+  currentDeliveryId = '';
+  renderWorkspace();
+}
+
+function deleteCurrentFile(){
+  if(!currentFileId) return;
+  askConfirmation('deleteFile', 'أنت على وشك حذف هذا الملف بكل بيانات الاستلام والتسليم المسجلة فيه نهائياً.\n\nهذا الإجراء لا يمكن التراجع عنه.');
+}
+
+function askConfirmation(action, text){
+  pendingConfirmAction = action;
+  document.getElementById('confirmText').textContent = text;
+  document.getElementById('confirmOverlay').style.display = 'flex';
+}
+function closeConfirm(){
+  pendingConfirmAction = null;
+  document.getElementById('confirmOverlay').style.display = 'none';
+}
+function runConfirmedAction(){
+  if(pendingConfirmAction === 'deleteFile'){
+    const list = loadFiles().filter(f => f.id !== currentFileId);
+    saveFiles(list);
+    currentFileId = '';
+    localStorage.removeItem(LAST_FILE_KEY);
+    renderFileSelect();
+    document.getElementById('workspace').style.display = 'none';
+    showToast('🗑️ تم حذف الملف');
+  }
+  closeConfirm();
+}
+
+function switchMode(mode){
+  currentMode = mode;
+  currentDeliveryId = '';
+  const tabR = document.getElementById('tabReceiving');
+  const tabD = document.getElementById('tabDelivery');
+  tabR.classList.toggle('active', mode === 'receiving');
+  tabD.classList.toggle('active', mode === 'delivery');
+  tabD.classList.toggle('delivery-active', mode === 'delivery');
+  document.getElementById('deliverySetup').style.display = mode === 'delivery' ? 'block' : 'none';
+  document.getElementById('centerBtn').classList.toggle('delivery', mode === 'delivery');
+  if(mode === 'delivery'){ renderDeliverySelect(); }
+  renderCounterArea();
+  renderTally();
+}
+
+function renderDeliverySelect(){
+  const file = getFile(currentFileId);
+  const sel = document.getElementById('deliverySelect');
+  const openDeliveries = (file.deliveries || []).filter(d => !d.completedAt);
+  sel.innerHTML = '<option value="">— بدون عملية نشطة —</option>' +
+    openDeliveries.map(d => `<option value="${d.id}">${d.customerName || '(بدون اسم)'} — الهدف ${formatTons(d.targetTons)} طن</option>`).join('');
+  if(currentDeliveryId && openDeliveries.some(d => d.id === currentDeliveryId)){
+    sel.value = currentDeliveryId;
+  } else {
+    currentDeliveryId = '';
+  }
+  document.getElementById('newDeliveryForm').style.display = currentDeliveryId ? 'none' : 'block';
+}
+function onDeliverySelect(){
+  currentDeliveryId = document.getElementById('deliverySelect').value;
+  document.getElementById('newDeliveryForm').style.display = currentDeliveryId ? 'none' : 'block';
+  renderCounterArea();
+  renderTally();
+}
+
+function startNewDelivery(){
+  const file = getFile(currentFileId);
+  const customerName = document.getElementById('ndCustomer').value.trim();
+  let targetTons = parseFloat(document.getElementById('ndTargetTons').value) || 0;
+  const targetPalletsInput = parseFloat(document.getElementById('ndTargetPallets').value) || 0;
+  const pw = palletWeight(file);
+  let targetPallets = targetPalletsInput;
+  if(!targetPallets && targetTons && pw > 0){ targetPallets = Math.round(targetTons / pw); }
+  if(!targetTons && targetPallets && pw > 0){ targetTons = roundTo3(targetPallets * pw); }
+  if(!(targetPallets > 0)){ showToast('⚠️ أدخل الكمية المطلوبة بالطن أو عدد المنصات'); return; }
+  const delivery = {
+    id: genId(), customerName, targetTons, targetPallets, createdAt: Date.now(), completedAt: null, entries: []
+  };
+  updateFile(currentFileId, f => { f.deliveries = f.deliveries || []; f.deliveries.push(delivery); });
+  currentDeliveryId = delivery.id;
+  document.getElementById('ndCustomer').value = '';
+  document.getElementById('ndTargetTons').value = '';
+  document.getElementById('ndTargetPallets').value = '';
+  renderDeliverySelect();
+  renderCounterArea();
+  renderTally();
+  showToast('🚚 تم بدء عملية تسليم جديدة');
+}
+
+function currentContext(){
+  const file = getFile(currentFileId);
+  if(!file) return null;
+  if(currentMode === 'receiving'){
+    return { file, entries: file.receiving.entries, target: targetPalletsReceiving(file) };
+  }
+  const delivery = (file.deliveries || []).find(d => d.id === currentDeliveryId);
+  if(!delivery) return { file, entries: null, target: 0 };
+  return { file, entries: delivery.entries, target: delivery.targetPallets, delivery };
+}
+
+function renderCounterArea(){
+  const ctx = currentContext();
+  const area = document.getElementById('counterArea');
+  const note = document.getElementById('noTargetNote');
+  if(!ctx || !ctx.entries || !(ctx.target > 0)){
+    area.style.display = 'none';
+    note.style.display = 'block';
+    note.textContent = currentMode === 'delivery' && (!ctx || !ctx.entries)
+      ? '⚠️ اختر عملية تسليم نشطة أو ابدأ عملية جديدة أعلاه'
+      : '⚠️ أدخل عدد الأكياس/المنصة والكمية أو عدد المنصات في بيانات الملف لتفعيل العداد';
+    return;
+  }
+  area.style.display = 'block';
+  note.style.display = 'none';
+  const pw = palletWeight(ctx.file);
+  const filled = ctx.entries.length;
+  const remaining = Math.max(0, ctx.target - filled);
+  const pctFilled = ctx.target > 0 ? Math.min(100, (filled/ctx.target)*100) : 0;
+  const pctRemaining = 100 - pctFilled;
+  document.getElementById('numFilled').textContent = filled;
+  document.getElementById('numRemaining').textContent = remaining;
+  document.getElementById('tonsFilled').textContent = formatTons(filled*pw);
+  document.getElementById('tonsRemaining').textContent = formatTons(remaining*pw);
+  document.getElementById('ringFilled').style.background = `conic-gradient(var(--green) ${pctFilled}%, rgba(255,255,255,0.08) ${pctFilled}% 100%)`;
+  document.getElementById('ringRemaining').style.background = `conic-gradient(var(--amber) ${pctRemaining}%, rgba(255,255,255,0.08) ${pctRemaining}% 100%)`;
+  document.getElementById('centerBtn').disabled = remaining <= 0;
+}
+
+function computeTally(entries){
+  const map = {};
+  entries.forEach(e => { map[e.lot] = (map[e.lot]||0) + 1; });
+  return map;
+}
+
+function renderTally(){
+  const ctx = currentContext();
+  const body = document.getElementById('tallyBody');
+  if(!ctx || !ctx.entries || ctx.entries.length === 0){
+    body.innerHTML = '<tr><td colspan="3" class="empty-note" style="border:none;">لا توجد منصات مسجَّلة بعد</td></tr>';
+    return;
+  }
+  const pw = palletWeight(ctx.file);
+  const tally = computeTally(ctx.entries);
+  const rows = Object.keys(tally).sort((a,b) => tally[b]-tally[a] || a.localeCompare(b, 'ar', {numeric:true}));
+  body.innerHTML = rows.map(lot => `<tr><td>${lot}</td><td>${tally[lot]}</td><td>${formatTons(tally[lot]*pw)}</td></tr>`).join('');
+}
+
+// ----- Lot entry modal -----
+function openLotModal(){
+  const ctx = currentContext();
+  if(!ctx || !ctx.entries) return;
+  document.getElementById('lotInput').value = '';
+  document.getElementById('lotModalOverlay').style.display = 'flex';
+  renderExpectedChips();
+  renderSuggestChips('');
+  setTimeout(() => document.getElementById('lotInput').focus(), 50);
+}
+function closeLotModal(){
+  document.getElementById('lotModalOverlay').style.display = 'none';
+}
+function renderExpectedChips(){
+  const ctx = currentContext();
+  const wrap = document.getElementById('expectedChipsWrap');
+  const box = document.getElementById('expectedChips');
+  const list = (ctx.file.expectedLots || []);
+  if(list.length === 0){ wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  box.innerHTML = list.map(n => `<span class="chip" onclick="pickLotChip('${n}')">${n}</span>`).join('');
+}
+function onLotInput(){
+  renderSuggestChips(document.getElementById('lotInput').value.trim());
+}
+function renderSuggestChips(typedValue){
+  const ctx = currentContext();
+  const wrap = document.getElementById('suggestChipsWrap');
+  const box = document.getElementById('suggestChips');
+  if(!typedValue || typedValue.length < 2){ wrap.style.display = 'none'; box.innerHTML=''; return; }
+  const prefix = typedValue.slice(0,2);
+  const tally = computeTally(ctx.entries);
+  const candidates = Object.keys(tally).filter(n => tally[n] > 3 && n.startsWith(prefix) && n !== typedValue);
+  if(candidates.length === 0){ wrap.style.display = 'none'; box.innerHTML=''; return; }
+  wrap.style.display = 'block';
+  box.innerHTML = candidates.map(n => `<span class="chip suggest" onclick="pickLotChip('${n}')">${n} <small style="opacity:0.7">(×${tally[n]})</small></span>`).join('');
+}
+function pickLotChip(n){
+  document.getElementById('lotInput').value = n;
+  renderSuggestChips(n);
+}
+function confirmLotEntry(){
+  const val = document.getElementById('lotInput').value.trim();
+  if(!val){ showToast('⚠️ أدخل رقم الحصة'); return; }
+  registerLot(val);
+  closeLotModal();
+}
+
+function registerLot(lotNumber){
+  const ctx = currentContext();
+  if(!ctx || !ctx.entries) return;
+  if(currentMode === 'receiving'){
+    updateFile(currentFileId, f => { f.receiving.entries.push({ lot: lotNumber, ts: Date.now() }); });
+  } else {
+    updateFile(currentFileId, f => {
+      const d = f.deliveries.find(x => x.id === currentDeliveryId);
+      if(d) d.entries.push({ lot: lotNumber, ts: Date.now() });
+    });
+  }
+  renderCounterArea();
+  renderTally();
+  const newCtx = currentContext();
+  if(newCtx && newCtx.entries.length >= newCtx.target && newCtx.target > 0){
+    if(currentMode === 'delivery'){
+      updateFile(currentFileId, f => {
+        const d = f.deliveries.find(x => x.id === currentDeliveryId);
+        if(d && !d.completedAt) d.completedAt = Date.now();
+      });
+      renderDeliverySelect();
+    }
+    showToast('✅ تم الوصول إلى الكمية المستهدفة بالكامل');
+  } else {
+    showToast('✅ تم تسجيل المنصة');
+  }
+}
+
+function undoLast(){
+  const ctx = currentContext();
+  if(!ctx || !ctx.entries || ctx.entries.length === 0) return;
+  if(currentMode === 'receiving'){
+    updateFile(currentFileId, f => { f.receiving.entries.pop(); });
+  } else {
+    updateFile(currentFileId, f => {
+      const d = f.deliveries.find(x => x.id === currentDeliveryId);
+      if(d){ d.entries.pop(); d.completedAt = null; }
+    });
+    renderDeliverySelect();
+  }
+  renderCounterArea();
+  renderTally();
+  showToast('↩️ تم التراجع عن آخر تسجيل');
+}
+
+// ----- File info card -----
+function renderFileInfo(){
+  const file = getFile(currentFileId);
+  const el = document.getElementById('fileInfoLines');
+  if(!file){ el.innerHTML = ''; return; }
+  const pw = palletWeight(file);
+  const targetR = targetPalletsReceiving(file);
+  const lines = [
+    `نوع البودرة: <b>${file.powderType}</b> · رقم الملف: <b>${file.fileNumber}</b>`,
+    file.contractNumber ? `رقم العقد: <b>${file.contractNumber}</b>` : '',
+    file.shipName ? `الباخرة: <b>${file.shipName}</b>${file.arrivalDate ? ' · وصول: <b>'+file.arrivalDate+'</b>' : ''}` : '',
+    file.prodDate ? `تاريخ الإنتاج: <b>${file.prodDate}</b>${file.expiryDate ? ' · الصلاحية حتى: <b>'+file.expiryDate+'</b>' : ''}` : '',
+    `الكمية المتعاقد عليها: <b>${formatTons(file.contractedQty)}</b> طن`,
+    `عدد الأكياس: <b>${file.totalBags||'—'}</b> · عدد المنصات: <b>${targetR || '—'}</b> (${file.bagsPerPallet} كيس/منصة × ${file.bagWeight} كغ = ${formatTons(pw)} طن/منصة)`,
+    (file.lotsCount || (file.expectedLots||[]).length) ? `عدد الحصص: <b>${file.lotsCount || (file.expectedLots||[]).length}</b>${(file.expectedLots||[]).length ? ' — أرقامها: <b>'+file.expectedLots.join(', ')+'</b>' : ''}` : ''
+  ].filter(Boolean);
+  el.innerHTML = lines.map(l => `<div class="info-line">${l}</div>`).join('');
+}
+
+function renderWorkspace(){
+  const file = getFile(currentFileId);
+  if(!file){ document.getElementById('workspace').style.display = 'none'; return; }
+  document.getElementById('workspace').style.display = 'block';
+  renderFileInfo();
+  switchMode(currentMode);
+}
+
+// ----- Excel export -----
+function loadXLSXLibrary(){
+  return new Promise((resolve, reject) => {
+    if(window.XLSX){ resolve(); return; }
+    const script = document.createElement('script');
+    script.crossOrigin = 'anonymous';
+    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('تعذر تحميل مكتبة Excel'));
+    document.head.appendChild(script);
+  });
+}
+
+async function exportExcel(){
+  const file = getFile(currentFileId);
+  if(!file){ showToast('⚠️ اختر ملفاً أولاً'); return; }
+  showToast('⏳ يتم تجهيز ملف Excel...');
+  try{ await loadXLSXLibrary(); }catch(e){ showToast('⚠️ تعذر تحميل مكتبة Excel — تحقق من الاتصال'); return; }
+
+  const pw = palletWeight(file);
+  const infoRows = [
+    ['نوع البودرة', file.powderType],
+    ['رقم الملف', file.fileNumber],
+    ['تاريخ الإنتاج', file.prodDate || ''],
+    ['تاريخ نهاية الصلاحية', file.expiryDate || ''],
+    ['رقم العقد', file.contractNumber || ''],
+    ['اسم الباخرة', file.shipName || ''],
+    ['تاريخ وصول الباخرة', file.arrivalDate || ''],
+    ['الكمية المتعاقد عليها (طن)', roundTo3(file.contractedQty)],
+    ['عدد الأكياس الإجمالي', file.totalBags || ''],
+    ['عدد المنصات الإجمالي (مستهدف)', targetPalletsReceiving(file)],
+    ['عدد الأكياس في المنصة', file.bagsPerPallet],
+    ['وزن الكيس (كغ)', file.bagWeight],
+    ['وزن المنصة (طن)', pw],
+    ['عدد الحصص', file.lotsCount || (file.expectedLots||[]).length || ''],
+    ['أرقام الحصص المتوقعة', (file.expectedLots||[]).join(', ')]
+  ];
+
+  const recvEntries = file.receiving.entries || [];
+  const recvDetailRows = [['#','رقم الحصة','التاريخ والوقت']];
+  recvEntries.forEach((e,i) => recvDetailRows.push([i+1, e.lot, new Date(e.ts).toLocaleString('fr-FR')]));
+  const recvTally = computeTally(recvEntries);
+  const recvSummaryRows = [['رقم الحصة','عدد المنصات','الوزن (طن)']];
+  Object.keys(recvTally).sort((a,b)=>recvTally[b]-recvTally[a]).forEach(lot => recvSummaryRows.push([lot, recvTally[lot], roundTo3(recvTally[lot]*pw)]));
+  recvSummaryRows.push(['الإجمالي', recvEntries.length, roundTo3(recvEntries.length*pw)]);
+
+  const delivDetailRows = [['رقم عملية التسليم','الزبون','رقم الحصة','التاريخ والوقت']];
+  const delivSummaryRows = [['رقم عملية التسليم','الزبون','رقم الحصة','عدد المنصات','الوزن (طن)']];
+  (file.deliveries||[]).forEach((d, di) => {
+    const tally = computeTally(d.entries || []);
+    (d.entries||[]).forEach(e => delivDetailRows.push([di+1, d.customerName||'', e.lot, new Date(e.ts).toLocaleString('fr-FR')]));
+    Object.keys(tally).sort((a,b)=>tally[b]-tally[a]).forEach(lot => delivSummaryRows.push([di+1, d.customerName||'', lot, tally[lot], roundTo3(tally[lot]*pw)]));
+    delivSummaryRows.push([di+1, d.customerName||'', 'إجمالي العملية', (d.entries||[]).length, roundTo3((d.entries||[]).length*pw)]);
+  });
+  if((file.deliveries||[]).length === 0){
+    delivDetailRows.push(['لا توجد عمليات تسليم مسجلة بعد','','','']);
+    delivSummaryRows.push(['لا توجد عمليات تسليم مسجلة بعد','','','','']);
+  }
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(infoRows), 'بيانات الملف');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recvDetailRows), 'الاستلام - تفصيل');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recvSummaryRows), 'الاستلام - ملخص الحصص');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(delivDetailRows), 'التسليم - تفصيل');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(delivSummaryRows), 'التسليم - ملخص الحصص');
+
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  XLSX.writeFile(wb, `حصص_${file.fileNumber || 'ملف'}_${stamp}.xlsx`);
+  showToast('✅ تم تصدير ملف Excel');
+}
+
+// ----- Import from حاسبة الحليب backup -----
+function importFromMilkApp(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const payload = JSON.parse(e.target.result);
+      if(!payload || !payload.data || !payload.data.dossiers){ throw new Error('invalid'); }
+      const dossiersObj = JSON.parse(payload.data.dossiers || '{}');
+      let created = 0, updated = 0;
+      const list = loadFiles();
+      Object.keys(dossiersObj).forEach(type => {
+        (dossiersObj[type] || []).forEach(d => {
+          if(!d.name) return;
+          const expectedLots = d.lotsNumbers ? d.lotsNumbers.split(',').map(s => s.trim()).filter(Boolean) : [];
+          const existing = list.find(f => f.fileNumber === d.name && f.powderType === type);
+          if(existing){
+            existing.prodDate = d.prodDate || existing.prodDate;
+            existing.expiryDate = d.expiry || existing.expiryDate;
+            existing.contractNumber = d.contractNumber || existing.contractNumber;
+            existing.shipName = d.shipName || existing.shipName;
+            existing.arrivalDate = d.arrivalDate || existing.arrivalDate;
+            existing.contractedQty = d.initialQty || existing.contractedQty;
+            existing.bagsPerPallet = d.bagsPerPallet || existing.bagsPerPallet;
+            existing.lotsCount = d.lotsCount || existing.lotsCount;
+            if(expectedLots.length) existing.expectedLots = expectedLots;
+            updated++;
+          } else {
+            list.push({
+              id: genId(), powderType: type, fileNumber: d.name,
+              prodDate: d.prodDate || '', expiryDate: d.expiry || '',
+              contractNumber: d.contractNumber || '', shipName: d.shipName || '',
+              arrivalDate: d.arrivalDate || '', contractedQty: d.initialQty || 0,
+              totalBags: 0, totalPallets: 0, bagsPerPallet: d.bagsPerPallet || 0, bagWeight: 25,
+              lotsCount: d.lotsCount || '', expectedLots,
+              receiving: { entries: [] }, deliveries: [], importedFromMilkApp: true
+            });
+            created++;
+          }
+        });
+      });
+      saveFiles(list);
+      renderFileSelect();
+      showToast(`✅ تم الاستيراد من حاسبة الحليب: ${created} ملف جديد، ${updated} محدَّث`);
+    }catch(err){
+      showToast('⚠️ الملف غير صالح — يجب رفع النسخة الاحتياطية (JSON) المصدَّرة من حاسبة الحليب');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+
+// ----- Merge multiple lots-app Excel exports into one consolidated file (read-only, no local writes) -----
+async function mergeLotsReports(event){
+  const filesList = Array.from(event.target.files || []);
+  const resultEl = document.getElementById('mergeResult');
+  if(filesList.length === 0) return;
+  resultEl.textContent = '⏳ جارٍ قراءة الملفات ودمجها...';
+  try{ await loadXLSXLibrary(); }catch(e){ resultEl.textContent = '⚠️ تعذر تحميل مكتبة Excel'; return; }
+
+  const fileInfoMap = new Map();   // fileNumber -> info rows array
+  const recvMap = new Map();       // key -> {fileNumber, lot, ts}
+  const delivMap = new Map();      // key -> {fileNumber, customer, lot, ts, delivIndex}
+
+  for(const f of filesList){
+    const buf = await f.arrayBuffer();
+    let wb;
+    try{ wb = XLSX.read(new Uint8Array(buf), {type:'array'}); }catch(e){ continue; }
+    const infoSheet = wb.Sheets['بيانات الملف'];
+    if(!infoSheet) continue;
+    const infoRows = XLSX.utils.sheet_to_json(infoSheet, {header:1});
+    const info = {};
+    infoRows.forEach(r => { if(r[0] !== undefined) info[r[0]] = r[1]; });
+    const fileNumber = info['رقم الملف'];
+    if(!fileNumber) continue;
+    if(!fileInfoMap.has(fileNumber)) fileInfoMap.set(fileNumber, info);
+
+    const recvSheet = wb.Sheets['الاستلام - تفصيل'];
+    if(recvSheet){
+      const rows = XLSX.utils.sheet_to_json(recvSheet, {header:1}).slice(1);
+      rows.forEach(r => {
+        if(!r[1]) return;
+        const key = fileNumber + '||' + r[1] + '||' + r[2];
+        if(!recvMap.has(key)) recvMap.set(key, { fileNumber, lot: r[1], ts: r[2] });
+      });
+    }
+    const delivSheet = wb.Sheets['التسليم - تفصيل'];
+    if(delivSheet){
+      const rows = XLSX.utils.sheet_to_json(delivSheet, {header:1}).slice(1);
+      rows.forEach(r => {
+        if(!r[2] || r[2] === '' || r[0] === undefined) return;
+        const customer = r[1] || '';
+        const key = fileNumber + '||' + r[0] + '||' + customer + '||' + r[2] + '||' + r[3];
+        if(!delivMap.has(key)) delivMap.set(key, { fileNumber, delivIndex: r[0], customer, lot: r[2], ts: r[3] });
+      });
+    }
+  }
+
+  if(fileInfoMap.size === 0){
+    resultEl.textContent = '⚠️ لم يتم العثور على بيانات صالحة داخل الملفات المرفوعة';
+    event.target.value = '';
+    return;
+  }
+
+  const palletWeightOf = (fileNumber) => parseFloat((fileInfoMap.get(fileNumber) || {})['وزن المنصة (طن)']) || 0;
+
+  const infoOutRows = [['رقم الملف','نوع البودرة','رقم العقد','اسم الباخرة','تاريخ وصول الباخرة','الكمية المتعاقد عليها (طن)','وزن المنصة (طن)']];
+  fileInfoMap.forEach((info, fn) => infoOutRows.push([fn, info['نوع البودرة']||'', info['رقم العقد']||'', info['اسم الباخرة']||'', info['تاريخ وصول الباخرة']||'', info['الكمية المتعاقد عليها (طن)']||'', info['وزن المنصة (طن)']||'']));
+
+  const recvDetailOut = [['رقم الملف','رقم الحصة','التاريخ والوقت']];
+  Array.from(recvMap.values()).sort((a,b) => a.fileNumber.localeCompare(b.fileNumber) || String(a.ts).localeCompare(String(b.ts)))
+    .forEach(e => recvDetailOut.push([e.fileNumber, e.lot, e.ts]));
+
+  const recvSummaryMap = new Map();
+  recvMap.forEach(e => {
+    const k = e.fileNumber + '||' + e.lot;
+    recvSummaryMap.set(k, (recvSummaryMap.get(k)||0) + 1);
+  });
+  const recvSummaryOut = [['رقم الملف','رقم الحصة','عدد المنصات','الوزن (طن)']];
+  recvSummaryMap.forEach((count, k) => {
+    const [fn, lot] = k.split('||');
+    recvSummaryOut.push([fn, lot, count, roundTo3(count * palletWeightOf(fn))]);
+  });
+
+  const delivDetailOut = [['رقم الملف','رقم عملية التسليم','الزبون','رقم الحصة','التاريخ والوقت']];
+  Array.from(delivMap.values()).sort((a,b) => a.fileNumber.localeCompare(b.fileNumber) || String(a.delivIndex).localeCompare(String(b.delivIndex)))
+    .forEach(e => delivDetailOut.push([e.fileNumber, e.delivIndex, e.customer, e.lot, e.ts]));
+
+  const delivSummaryMap = new Map();
+  delivMap.forEach(e => {
+    const k = e.fileNumber + '||' + e.delivIndex + '||' + e.customer + '||' + e.lot;
+    delivSummaryMap.set(k, (delivSummaryMap.get(k)||0) + 1);
+  });
+  const delivSummaryOut = [['رقم الملف','رقم عملية التسليم','الزبون','رقم الحصة','عدد المنصات','الوزن (طن)']];
+  delivSummaryMap.forEach((count, k) => {
+    const [fn, delivIndex, customer, lot] = k.split('||');
+    delivSummaryOut.push([fn, delivIndex, customer, lot, count, roundTo3(count * palletWeightOf(fn))]);
+  });
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(infoOutRows), 'الملفات المدموجة');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recvDetailOut), 'الاستلام المدموج - تفصيل');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(recvSummaryOut), 'الاستلام المدموج - ملخص');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(delivDetailOut), 'التسليم المدموج - تفصيل');
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(delivSummaryOut), 'التسليم المدموج - ملخص');
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  XLSX.writeFile(wb, `حصص_جامع_مدموج_${stamp}.xlsx`);
+
+  resultEl.innerHTML = `<div style="color:var(--accent);font-weight:700;">✅ تم دمج ${filesList.length} ملف/ملفات وتنزيل التقرير الجامع</div><div>📁 ملفات: ${fileInfoMap.size} · 📥 سطور استلام: ${recvMap.size} · 📤 سطور تسليم: ${delivMap.size}</div>`;
+  event.target.value = '';
+}
+
+// ----- Full workflow simulation (isolated demo file, never touches real data) -----
+function runFullSimulation(){
+  const powderType = Math.random() < 0.5 ? '0%' : '26%';
+  const bagsPerPallet = 56;
+  const bagWeight = 25;
+  const expectedLots = ['101','102','103','104','105'];
+  const demoFile = {
+    id: genId(), powderType, fileNumber: 'محاكاة-تجريبية-' + Date.now(),
+    prodDate: '', expiryDate: '', contractNumber: 'SIM-TEST', shipName: 'باخرة تجريبية (محاكاة)', arrivalDate: '',
+    contractedQty: 50, totalBags: 0, totalPallets: 30, bagsPerPallet, bagWeight,
+    lotsCount: expectedLots.length, expectedLots,
+    receiving: { entries: [] }, deliveries: [], isSimulation: true
+  };
+  const list = loadFiles();
+  list.push(demoFile);
+  saveFiles(list);
+
+  const target = targetPalletsReceiving(demoFile);
+  const recvEntries = [];
+  for(let i = 0; i < target; i++){
+    const lot = expectedLots[Math.floor(Math.random() * expectedLots.length)];
+    recvEntries.push({ lot, ts: Date.now() + i });
+  }
+  const deliveries = [];
+  const half = Math.max(1, Math.floor(target / 2));
+  ['زبون تجريبي أ', 'زبون تجريبي ب'].forEach((customer, idx) => {
+    const tgt = idx === 0 ? half : Math.max(1, target - half);
+    const entries = [];
+    for(let i = 0; i < tgt; i++){
+      const lot = expectedLots[Math.floor(Math.random() * expectedLots.length)];
+      entries.push({ lot, ts: Date.now() + 10000 + i });
+    }
+    deliveries.push({
+      id: genId(), customerName: customer, targetPallets: tgt,
+      targetTons: roundTo3(tgt * palletWeight(demoFile)),
+      createdAt: Date.now(), completedAt: Date.now(), entries
+    });
+  });
+
+  updateFile(demoFile.id, f => { f.receiving.entries = recvEntries; f.deliveries = deliveries; });
+
+  currentFileId = demoFile.id;
+  localStorage.setItem(LAST_FILE_KEY, currentFileId);
+  currentMode = 'receiving';
+  currentDeliveryId = '';
+  renderFileSelect();
+  document.getElementById('fileSelect').value = currentFileId;
+  renderWorkspace();
+  showToast('🧪 تم إنشاء وتشغيل محاكاة تجريبية كاملة (استلام + تسليم لزبونين) — جرّب التصدير ثم احذفها لاحقاً');
+}
+
+function deleteAllSimulations(){
+  const list = loadFiles();
+  const remaining = list.filter(f => !f.isSimulation);
+  const removedCount = list.length - remaining.length;
+  saveFiles(remaining);
+  if(currentFileId && !remaining.some(f => f.id === currentFileId)){
+    currentFileId = '';
+    localStorage.removeItem(LAST_FILE_KEY);
+    document.getElementById('workspace').style.display = 'none';
+  }
+  renderFileSelect();
+  showToast(removedCount > 0 ? `🗑️ تم حذف ${removedCount} ملف محاكاة` : 'لا توجد ملفات محاكاة لحذفها');
+}
+
+// ----- Toast -----
+let toastTimer = null;
+function showToast(message){
+  const el = document.getElementById('toast');
+  el.textContent = message;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+}
+
+// ----- Init -----
+renderFileSelect();
+if(currentFileId && getFile(currentFileId)){
+  document.getElementById('fileSelect').value = currentFileId;
+  renderWorkspace();
+}
+</script>
+</body>
+</html>
