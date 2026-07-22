@@ -2,7 +2,7 @@
   "name": "حاسبة الحصص",
   "short_name": "حاسبة الحصص",
   "description": "تطبيق حاسبة الحصص - ديوان الحليب",
-  "start_url": "./quota-calculator.html",
+  "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
