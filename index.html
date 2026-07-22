@@ -138,13 +138,14 @@ tbody tr:nth-child(even){background:rgba(255,255,255,0.03);}
       </div>
       <div class="field"><label>الكمية المتعاقد عليها (طن)</label><input type="number" id="nfContractedQty" min="0" step="0.001" placeholder="مثال: 504.000"></div>
       <div class="row">
-        <div class="field"><label>عدد الأكياس الإجمالي</label><input type="number" id="nfTotalBags" min="0" placeholder="عدد الأكياس"></div>
-        <div class="field"><label>عدد المنصات الإجمالي</label><input type="number" id="nfTotalPallets" min="0" placeholder="اتركه فارغاً للحساب تلقائياً"></div>
-      </div>
-      <div class="row">
         <div class="field"><label>عدد الأكياس في المنصة</label><input type="number" id="nfBagsPerPallet" min="1" placeholder="مثال: 56"></div>
         <div class="field"><label>وزن الكيس (كغ)</label><input type="number" id="nfBagWeight" min="0" step="0.1" value="25"></div>
       </div>
+      <div class="row">
+        <div class="field"><label>عدد المنصات (يُحسب/يُعدَّل)</label><input type="number" id="nfTotalPalletsCalc" min="0"></div>
+        <div class="field"><label>+ أكياس سائبة (يُحسب/يُعدَّل) <span id="nfBagsDot" style="display:none;color:var(--green);">●</span></label><input type="number" id="nfTotalBagsCalc" min="0"></div>
+      </div>
+      <div class="info-line">عدّل أي خانة (الطن / المنصات / الأكياس السائبة) وستتحدّث البقية تلقائياً.</div>
       <div class="field"><label>عدد الحصص</label><input type="number" id="nfLotsCount" min="0" placeholder="عدد الحصص المتوقعة"></div>
       <div class="field"><label>أرقام الحصص (مفصولة بفاصلة)</label><input type="text" id="nfLotsNumbers" placeholder="مثال: 101,102,103"></div>
       <button class="btn-primary" onclick="createNewFile()">💾 حفظ الملف</button>
@@ -166,15 +167,27 @@ tbody tr:nth-child(even){background:rgba(255,255,255,0.03);}
       <input type="file" id="mergeLotsInput" accept=".xlsx" multiple onchange="mergeLotsReports(event)">
       <div id="mergeResult" style="margin-top:8px;font-size:12px;"></div>
     </div>
+  </div>
 
-    <div>
-      <label>🧪 محاكاة تجريبية شاملة</label>
-      <div class="info-line" style="margin-bottom:6px;">ينشئ ملفاً تجريبياً منفصلاً ويشغّل تلقائياً عملية استلام كاملة وعمليتَي تسليم لزبونين وهميين، لاختبار سير العمل كاملاً (العدادات، الاقتراحات، التصدير) دون أي تأثير على ملفاتك الحقيقية.</div>
-      <div class="row">
-        <button class="btn-secondary" onclick="runFullSimulation()">▶️ تشغيل محاكاة جديدة</button>
-        <button class="btn-danger" onclick="deleteAllSimulations()">🗑️ حذف كل ملفات المحاكاة</button>
-      </div>
+  <div class="card" id="backupCard">
+    <h2>💾 نسخة احتياطية لهذا التطبيق</h2>
+    <div id="backupReminder" style="display:none;margin-bottom:10px;padding:10px;border-radius:10px;background:rgba(219,165,62,0.18);border:1px solid var(--amber);color:#ffe1a8;font-size:12.5px;"></div>
+    <div class="info-line" style="margin-bottom:8px;">يُصدِّر كل ملفات الشحنات وعمليات الاستلام والتسليم المسجَّلة في هذا الجهاز إلى ملف JSON واحد يمكن استرجاعه لاحقاً أو على جهاز آخر.</div>
+    <button class="btn-primary" onclick="exportOwnBackup()">⬇️ تصدير نسخة احتياطية الآن (JSON)</button>
+    <label style="margin-top:10px;">📤 استرجاع نسخة احتياطية</label>
+    <input type="file" id="restoreBackupInput" accept=".json" onchange="restoreOwnBackup(event)">
+  </div>
+
+  <div class="card" id="globalLogCard">
+    <h2>📜 سجل جميع العمليات</h2>
+    <div class="info-line" style="margin-bottom:8px;">سجل كامل لكل عمليات الاستلام والتسليم المسجَّلة عبر كل الملفات في هذا الجهاز.</div>
+    <div class="row">
+      <div class="field"><label>من تاريخ</label><input type="date" id="logFromDate" onchange="updateGlobalLogSummary()"></div>
+      <div class="field"><label>إلى تاريخ</label><input type="date" id="logToDate" onchange="updateGlobalLogSummary()"></div>
     </div>
+    <div class="field"><label>رقم الملف (اختياري)</label><input type="text" id="logFileFilter" placeholder="فلترة برقم الملف" oninput="updateGlobalLogSummary()"></div>
+    <div id="globalLogSummary" class="info-line"></div>
+    <button class="btn-primary" onclick="exportGlobalLog()">⬇️ تصدير سجل العمليات (حسب الفلترة الحالية)</button>
   </div>
 
   <div id="workspace" style="display:none;">
@@ -201,6 +214,9 @@ tbody tr:nth-child(even){background:rgba(255,255,255,0.03);}
             <div class="field"><label>الكمية المطلوبة (طن)</label><input type="number" id="ndTargetTons" min="0" step="0.001" placeholder="بالطن"></div>
             <div class="field"><label>أو عدد المنصات</label><input type="number" id="ndTargetPallets" min="0" placeholder="عدد المنصات"></div>
           </div>
+          <div class="field"><label>+ أكياس سائبة (اختياري) <span id="ndBagsDot" style="display:none;color:var(--green);">●</span></label><input type="number" id="ndTargetLooseBags" min="0" placeholder="0"></div>
+          <div id="ndOverflowWarning" style="display:none;margin:6px 0 4px;padding:8px 10px;border-radius:8px;background:rgba(192,85,63,0.18);border:1px solid var(--danger);color:#ffb3a1;font-size:12px;"></div>
+          <div class="info-line">عدّل أي خانة وستتحدّث البقية تلقائياً حسب إعدادات هذا الملف.</div>
           <button class="btn-primary" onclick="startNewDelivery()">🚚 بدء عملية تسليم جديدة</button>
         </div>
       </div>
@@ -237,6 +253,14 @@ tbody tr:nth-child(even){background:rgba(255,255,255,0.03);}
   <div class="modal-box">
     <h3>📦 تسجيل رقم الحصة لهذه المنصة</h3>
     <input type="text" id="lotInput" inputmode="numeric" placeholder="رقم الحصة" oninput="onLotInput()" autofocus>
+    <div class="row" style="margin-top:10px;">
+      <button class="tab-btn active" id="unitFullBtn" onclick="setEntryUnit('pallet')" style="flex:1;">منصة كاملة</button>
+      <button class="tab-btn" id="unitBagsBtn" onclick="setEntryUnit('bags')" style="flex:1;">أكياس سائبة</button>
+    </div>
+    <div class="field" id="looseBagsField" style="display:none;margin-top:8px;">
+      <label>عدد الأكياس السائبة</label>
+      <input type="number" id="looseBagsInput" min="1" placeholder="مثال: 12">
+    </div>
     <div id="expectedChipsWrap" style="display:none;">
       <div class="chips-label">أرقام الحصص المتوقعة لهذا الملف</div>
       <div class="chips" id="expectedChips"></div>
@@ -274,6 +298,35 @@ function genId(){ return 'f_' + Date.now() + '_' + Math.random().toString(36).sl
 function roundTo3(v){ return Math.round((parseFloat(v)||0)*1000)/1000; }
 function formatTons(v){ return roundTo3(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3}); }
 
+// ----- Generic reciprocal calculator: tons <-> pallets <-> loose bags (edit any axis) -----
+function wireReciprocalCalc({tonsEl, palletsEl, bagsEl, getBagsPerPallet, getBagWeight, onUpdate}){
+  function fromTons(){
+    const bpp = getBagsPerPallet(), bw = getBagWeight();
+    const tons = parseFloat(tonsEl.value) || 0;
+    if(!(bw > 0) || !(bpp > 0)){ if(onUpdate) onUpdate(); return; }
+    const totalBags = Math.round((tons*1000/bw)*1000)/1000;
+    const pallets = Math.floor(totalBags/bpp);
+    const remBags = Math.max(0, Math.round(totalBags - pallets*bpp));
+    palletsEl.value = pallets > 0 ? pallets : '';
+    bagsEl.value = remBags > 0 ? remBags : '';
+    if(onUpdate) onUpdate();
+  }
+  function fromPalletsOrBags(){
+    const bpp = getBagsPerPallet(), bw = getBagWeight();
+    const pallets = parseFloat(palletsEl.value) || 0;
+    const remBags = parseFloat(bagsEl.value) || 0;
+    if(!(bw > 0) || !(bpp > 0)){ if(onUpdate) onUpdate(); return; }
+    const totalBags = pallets*bpp + remBags;
+    const tons = roundTo3(totalBags*bw/1000);
+    tonsEl.value = tons > 0 ? tons : '';
+    if(onUpdate) onUpdate();
+  }
+  tonsEl.addEventListener('input', fromTons);
+  palletsEl.addEventListener('input', fromPalletsOrBags);
+  bagsEl.addEventListener('input', fromPalletsOrBags);
+  return { recompute: fromTons };
+}
+
 let currentFileId = localStorage.getItem(LAST_FILE_KEY) || '';
 let currentMode = 'receiving'; // 'receiving' | 'delivery'
 let currentDeliveryId = '';
@@ -302,9 +355,17 @@ function remainingForDelivery(file){
   return Math.max(0, roundTo3((parseFloat(file.contractedQty)||0) - deliveredElsewhere - deliveredHere));
 }
 
+function looseBagsOf(file){
+  const bags = parseFloat(file.totalBags) || 0;
+  const perPallet = parseFloat(file.bagsPerPallet) || 0;
+  if(!(perPallet > 0) || !(bags > 0)) return 0;
+  const pallets = Math.floor(bags / perPallet);
+  return Math.round(bags - pallets*perPallet);
+}
+
 function targetPalletsReceiving(file){
   if(file.totalPallets && file.totalPallets > 0) return Math.round(file.totalPallets);
-  if(file.totalBags && file.bagsPerPallet) return Math.ceil(file.totalBags / file.bagsPerPallet);
+  if(file.totalBags && file.bagsPerPallet) return Math.floor(file.totalBags / file.bagsPerPallet);
   const pw = palletWeight(file);
   if(file.contractedQty && pw > 0) return Math.round(file.contractedQty / pw);
   return 0;
@@ -316,6 +377,8 @@ function renderFileSelect(){
   sel.innerHTML = '<option value="">— اختر ملفاً —</option>' +
     list.map(f => `<option value="${f.id}">${f.fileNumber || '(بدون رقم)'} · ${f.powderType}${f.shipName ? ' · '+f.shipName : ''}</option>`).join('');
   sel.value = currentFileId && getFile(currentFileId) ? currentFileId : '';
+  updateGlobalLogSummary();
+  checkBackupReminder();
 }
 
 function toggleNewFileForm(){
@@ -326,6 +389,20 @@ function toggleNewFileForm(){
   arrow.textContent = showing ? '▾' : '▴';
 }
 
+const nfCalc = wireReciprocalCalc({
+  tonsEl: document.getElementById('nfContractedQty'),
+  palletsEl: document.getElementById('nfTotalPalletsCalc'),
+  bagsEl: document.getElementById('nfTotalBagsCalc'),
+  getBagsPerPallet: () => parseFloat(document.getElementById('nfBagsPerPallet').value) || 0,
+  getBagWeight: () => parseFloat(document.getElementById('nfBagWeight').value) || 25,
+  onUpdate: () => {
+    const bags = parseFloat(document.getElementById('nfTotalBagsCalc').value) || 0;
+    document.getElementById('nfBagsDot').style.display = bags > 0 ? 'inline' : 'none';
+  }
+});
+document.getElementById('nfBagsPerPallet').addEventListener('input', () => nfCalc.recompute());
+document.getElementById('nfBagWeight').addEventListener('input', () => nfCalc.recompute());
+
 function createNewFile(){
   const fileNumber = document.getElementById('nfFileNumber').value.trim();
   const bagsPerPallet = parseFloat(document.getElementById('nfBagsPerPallet').value);
@@ -333,6 +410,12 @@ function createNewFile(){
   if(!(bagsPerPallet > 0)){ showToast('⚠️ أدخل عدد الأكياس في المنصة'); return; }
   const lotsNumbersRaw = document.getElementById('nfLotsNumbers').value.trim();
   const expectedLots = lotsNumbersRaw ? lotsNumbersRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+  const contractedQty = parseFloat(document.getElementById('nfContractedQty').value) || 0;
+  const bagWeight = parseFloat(document.getElementById('nfBagWeight').value) || 25;
+  const calcPallets = parseFloat(document.getElementById('nfTotalPalletsCalc').value);
+  const calcLooseBags = parseFloat(document.getElementById('nfTotalBagsCalc').value) || 0;
+  const totalPallets = calcPallets > 0 ? Math.floor(calcPallets) : (bagsPerPallet > 0 ? Math.floor((contractedQty*1000/bagWeight)/bagsPerPallet) : 0);
+  const totalBags = totalPallets*bagsPerPallet + calcLooseBags;
   const file = {
     id: genId(),
     powderType: document.getElementById('nfPowderType').value,
@@ -342,11 +425,11 @@ function createNewFile(){
     contractNumber: document.getElementById('nfContract').value.trim(),
     shipName: document.getElementById('nfShip').value.trim(),
     arrivalDate: document.getElementById('nfArrival').value,
-    contractedQty: parseFloat(document.getElementById('nfContractedQty').value) || 0,
-    totalBags: parseFloat(document.getElementById('nfTotalBags').value) || 0,
-    totalPallets: parseFloat(document.getElementById('nfTotalPallets').value) || 0,
+    contractedQty,
+    totalBags,
+    totalPallets,
     bagsPerPallet,
-    bagWeight: parseFloat(document.getElementById('nfBagWeight').value) || 25,
+    bagWeight,
     lotsCount: document.getElementById('nfLotsCount').value.trim(),
     expectedLots,
     receiving: { entries: [] },
@@ -357,7 +440,7 @@ function createNewFile(){
   saveFiles(list);
   currentFileId = file.id;
   localStorage.setItem(LAST_FILE_KEY, currentFileId);
-  ['nfFileNumber','nfProdDate','nfExpiryDate','nfContract','nfShip','nfArrival','nfContractedQty','nfTotalBags','nfTotalPallets','nfBagsPerPallet','nfLotsCount','nfLotsNumbers']
+  ['nfFileNumber','nfProdDate','nfExpiryDate','nfContract','nfShip','nfArrival','nfContractedQty','nfBagsPerPallet','nfLotsCount','nfLotsNumbers','nfTotalPalletsCalc','nfTotalBagsCalc']
     .forEach(id => document.getElementById(id).value = '');
   document.getElementById('nfBagWeight').value = 25;
   toggleNewFileForm();
@@ -391,6 +474,11 @@ function closeConfirm(){
   document.getElementById('confirmOverlay').style.display = 'none';
 }
 function runConfirmedAction(){
+  if(typeof pendingConfirmAction === 'function'){
+    pendingConfirmAction();
+    closeConfirm();
+    return;
+  }
   if(pendingConfirmAction === 'deleteFile'){
     const list = loadFiles().filter(f => f.id !== currentFileId);
     saveFiles(list);
@@ -413,7 +501,7 @@ function switchMode(mode){
   tabD.classList.toggle('delivery-active', mode === 'delivery');
   document.getElementById('deliverySetup').style.display = mode === 'delivery' ? 'block' : 'none';
   document.getElementById('centerBtn').classList.toggle('delivery', mode === 'delivery');
-  if(mode === 'delivery'){ renderDeliverySelect(); }
+  if(mode === 'delivery'){ renderDeliverySelect(); if(typeof ndCalc !== 'undefined') ndCalc.recompute(); }
   renderCounterArea();
   renderTally();
 }
@@ -422,10 +510,11 @@ function renderDeliverySelect(){
   const file = getFile(currentFileId);
   const sel = document.getElementById('deliverySelect');
   const openDeliveries = (file.deliveries || []).filter(d => !d.completedAt);
+  const allDeliveries = file.deliveries || [];
   sel.innerHTML = '<option value="">— بدون عملية نشطة —</option>' +
     openDeliveries.map(d => `<option value="${d.id}">${d.customerName || '(بدون اسم)'} — الهدف ${formatTons(d.targetTons)} طن</option>`).join('');
-  if(currentDeliveryId && openDeliveries.some(d => d.id === currentDeliveryId)){
-    sel.value = currentDeliveryId;
+  if(currentDeliveryId && allDeliveries.some(d => d.id === currentDeliveryId)){
+    if(openDeliveries.some(d => d.id === currentDeliveryId)) sel.value = currentDeliveryId;
   } else {
     currentDeliveryId = '';
   }
@@ -438,24 +527,51 @@ function onDeliverySelect(){
   renderTally();
 }
 
+const ndCalc = wireReciprocalCalc({
+  tonsEl: document.getElementById('ndTargetTons'),
+  palletsEl: document.getElementById('ndTargetPallets'),
+  bagsEl: document.getElementById('ndTargetLooseBags'),
+  getBagsPerPallet: () => { const f = getFile(currentFileId); return f ? (parseFloat(f.bagsPerPallet)||0) : 0; },
+  getBagWeight: () => { const f = getFile(currentFileId); return f ? (parseFloat(f.bagWeight)||25) : 25; },
+  onUpdate: () => {
+    const bags = parseFloat(document.getElementById('ndTargetLooseBags').value) || 0;
+    document.getElementById('ndBagsDot').style.display = bags > 0 ? 'inline' : 'none';
+    const warnEl = document.getElementById('ndOverflowWarning');
+    const file = getFile(currentFileId);
+    const tons = parseFloat(document.getElementById('ndTargetTons').value) || 0;
+    if(!file || !(tons > 0)){ warnEl.style.display = 'none'; return; }
+    const remaining = remainingForDelivery(file);
+    if(tons > remaining + 0.0001){
+      warnEl.style.display = 'block';
+      warnEl.textContent = `⚠️ الكمية المدخلة (${formatTons(tons)} طن) تتجاوز الرصيد المتبقي المتاح للتسليم (${formatTons(remaining)} طن)`;
+    } else {
+      warnEl.style.display = 'none';
+    }
+  }
+});
+
 function startNewDelivery(){
   const file = getFile(currentFileId);
   const customerName = document.getElementById('ndCustomer').value.trim();
   let targetTons = parseFloat(document.getElementById('ndTargetTons').value) || 0;
   const targetPalletsInput = parseFloat(document.getElementById('ndTargetPallets').value) || 0;
+  const looseBagsInput = parseFloat(document.getElementById('ndTargetLooseBags').value) || 0;
   const pw = palletWeight(file);
-  let targetPallets = targetPalletsInput;
-  if(!targetPallets && targetTons && pw > 0){ targetPallets = Math.round(targetTons / pw); }
-  if(!targetTons && targetPallets && pw > 0){ targetTons = roundTo3(targetPallets * pw); }
-  if(!(targetPallets > 0)){ showToast('⚠️ أدخل الكمية المطلوبة بالطن أو عدد المنصات'); return; }
+  const bpp = parseFloat(file.bagsPerPallet) || 0;
+  let targetUnits = targetPalletsInput + (bpp > 0 ? looseBagsInput/bpp : 0);
+  if(!targetUnits && targetTons && pw > 0){ targetUnits = targetTons / pw; }
+  if(!targetTons && targetUnits && pw > 0){ targetTons = roundTo3(targetUnits * pw); }
+  if(!(targetUnits > 0)){ showToast('⚠️ أدخل الكمية المطلوبة بالطن أو عدد المنصات'); return; }
   const delivery = {
-    id: genId(), customerName, targetTons, targetPallets, createdAt: Date.now(), completedAt: null, entries: []
+    id: genId(), customerName, targetTons, targetPallets: targetUnits, targetLooseBags: looseBagsInput,
+    createdAt: Date.now(), completedAt: null, entries: []
   };
   updateFile(currentFileId, f => { f.deliveries = f.deliveries || []; f.deliveries.push(delivery); });
   currentDeliveryId = delivery.id;
   document.getElementById('ndCustomer').value = '';
   document.getElementById('ndTargetTons').value = '';
   document.getElementById('ndTargetPallets').value = '';
+  document.getElementById('ndTargetLooseBags').value = '';
   renderDeliverySelect();
   renderCounterArea();
   renderTally();
@@ -473,6 +589,18 @@ function currentContext(){
   return { file, entries: delivery.entries, target: delivery.targetPallets, delivery };
 }
 
+function entryWeight(entry, file){
+  if(entry.bags){ return (parseFloat(entry.bags)||0) * (parseFloat(file.bagWeight)||25) / 1000; }
+  return palletWeight(file);
+}
+function entryUnits(entry, file){
+  if(entry.bags){
+    const perPallet = parseFloat(file.bagsPerPallet) || 0;
+    return perPallet > 0 ? (parseFloat(entry.bags)||0) / perPallet : 0;
+  }
+  return 1;
+}
+
 function renderCounterArea(){
   const ctx = currentContext();
   const area = document.getElementById('counterArea');
@@ -488,22 +616,27 @@ function renderCounterArea(){
   area.style.display = 'block';
   note.style.display = 'none';
   const pw = palletWeight(ctx.file);
-  const filled = ctx.entries.length;
-  const remaining = Math.max(0, ctx.target - filled);
-  const pctFilled = ctx.target > 0 ? Math.min(100, (filled/ctx.target)*100) : 0;
+  const filledUnits = ctx.entries.reduce((s,e) => s + entryUnits(e, ctx.file), 0);
+  const filledTons = ctx.entries.reduce((s,e) => s + entryWeight(e, ctx.file), 0);
+  const remaining = Math.max(0, ctx.target - filledUnits);
+  const pctFilled = ctx.target > 0 ? Math.min(100, (filledUnits/ctx.target)*100) : 0;
   const pctRemaining = 100 - pctFilled;
-  document.getElementById('numFilled').textContent = filled;
-  document.getElementById('numRemaining').textContent = remaining;
-  document.getElementById('tonsFilled').textContent = formatTons(filled*pw);
-  document.getElementById('tonsRemaining').textContent = formatTons(remaining*pw);
+  document.getElementById('numFilled').textContent = formatTons(filledUnits);
+  document.getElementById('numRemaining').textContent = formatTons(remaining);
+  document.getElementById('tonsFilled').textContent = formatTons(filledTons);
+  document.getElementById('tonsRemaining').textContent = formatTons(Math.max(0, roundTo3(ctx.target*pw - filledTons)));
   document.getElementById('ringFilled').style.background = `conic-gradient(var(--green) ${pctFilled}%, rgba(255,255,255,0.08) ${pctFilled}% 100%)`;
   document.getElementById('ringRemaining').style.background = `conic-gradient(var(--amber) ${pctRemaining}%, rgba(255,255,255,0.08) ${pctRemaining}% 100%)`;
   document.getElementById('centerBtn').disabled = remaining <= 0;
 }
 
-function computeTally(entries){
+function computeTally(entries, file){
   const map = {};
-  entries.forEach(e => { map[e.lot] = (map[e.lot]||0) + 1; });
+  entries.forEach(e => {
+    if(!map[e.lot]) map[e.lot] = { pallets: 0, looseBags: 0 };
+    if(e.bags){ map[e.lot].looseBags += (parseFloat(e.bags)||0); }
+    else { map[e.lot].pallets += 1; }
+  });
   return map;
 }
 
@@ -515,16 +648,31 @@ function renderTally(){
     return;
   }
   const pw = palletWeight(ctx.file);
-  const tally = computeTally(ctx.entries);
-  const rows = Object.keys(tally).sort((a,b) => tally[b]-tally[a] || a.localeCompare(b, 'ar', {numeric:true}));
-  body.innerHTML = rows.map(lot => `<tr><td>${lot}</td><td>${tally[lot]}</td><td>${formatTons(tally[lot]*pw)}</td></tr>`).join('');
+  const bagW = (parseFloat(ctx.file.bagWeight)||25)/1000;
+  const tally = computeTally(ctx.entries, ctx.file);
+  const rows = Object.keys(tally).sort((a,b) => (tally[b].pallets+tally[b].looseBags) - (tally[a].pallets+tally[a].looseBags) || a.localeCompare(b, 'ar', {numeric:true}));
+  body.innerHTML = rows.map(lot => {
+    const t = tally[lot];
+    const label = t.looseBags > 0 ? `${t.pallets} منصة${t.pallets?' + ':''}${t.looseBags} كيس سائب` : `${t.pallets}`;
+    const weight = roundTo3(t.pallets*pw + t.looseBags*bagW);
+    return `<tr><td>${lot}</td><td>${label}</td><td>${formatTons(weight)}</td></tr>`;
+  }).join('');
 }
 
 // ----- Lot entry modal -----
+let entryUnitMode = 'pallet'; // 'pallet' | 'bags'
+function setEntryUnit(mode){
+  entryUnitMode = mode;
+  document.getElementById('unitFullBtn').classList.toggle('active', mode === 'pallet');
+  document.getElementById('unitBagsBtn').classList.toggle('active', mode === 'bags');
+  document.getElementById('looseBagsField').style.display = mode === 'bags' ? 'block' : 'none';
+}
 function openLotModal(){
   const ctx = currentContext();
   if(!ctx || !ctx.entries) return;
   document.getElementById('lotInput').value = '';
+  document.getElementById('looseBagsInput').value = '';
+  setEntryUnit('pallet');
   document.getElementById('lotModalOverlay').style.display = 'flex';
   renderExpectedChips();
   renderSuggestChips('');
@@ -564,39 +712,63 @@ function pickLotChip(n){
 function confirmLotEntry(){
   const val = document.getElementById('lotInput').value.trim();
   if(!val){ showToast('⚠️ أدخل رقم الحصة'); return; }
-  registerLot(val);
+  let bags = 0;
+  if(entryUnitMode === 'bags'){
+    bags = parseInt(document.getElementById('looseBagsInput').value) || 0;
+    if(bags <= 0){ showToast('⚠️ أدخل عدد الأكياس السائبة'); return; }
+  }
+  registerLot(val, bags);
   closeLotModal();
 }
 
-function registerLot(lotNumber){
+let actionLock = false;
+function withLock(fn){
+  if(actionLock) return;
+  actionLock = true;
+  try{ fn(); } finally { setTimeout(() => { actionLock = false; }, 250); }
+}
+
+function registerLot(lotNumber, bags){
+  withLock(() => {
   const ctx = currentContext();
   if(!ctx || !ctx.entries) return;
+  const entry = bags > 0 ? { lot: lotNumber, ts: Date.now(), bags } : { lot: lotNumber, ts: Date.now() };
   if(currentMode === 'receiving'){
-    updateFile(currentFileId, f => { f.receiving.entries.push({ lot: lotNumber, ts: Date.now() }); });
+    updateFile(currentFileId, f => { f.receiving.entries.push(entry); });
   } else {
     updateFile(currentFileId, f => {
       const d = f.deliveries.find(x => x.id === currentDeliveryId);
-      if(d) d.entries.push({ lot: lotNumber, ts: Date.now() });
+      if(d) d.entries.push(entry);
     });
   }
   renderCounterArea();
   renderTally();
+  updateGlobalLogSummary();
   const newCtx = currentContext();
-  if(newCtx && newCtx.entries.length >= newCtx.target && newCtx.target > 0){
+  const filledUnits = newCtx ? newCtx.entries.reduce((s,e) => s + entryUnits(e, newCtx.file), 0) : 0;
+  if(newCtx && newCtx.target > 0 && filledUnits >= newCtx.target - 0.0001){
     if(currentMode === 'delivery'){
       updateFile(currentFileId, f => {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
         if(d && !d.completedAt) d.completedAt = Date.now();
       });
       renderDeliverySelect();
+      renderFileInfo();
     }
     showToast('✅ تم الوصول إلى الكمية المستهدفة بالكامل');
   } else {
-    showToast('✅ تم تسجيل المنصة');
+    const remainingUnits = newCtx.target - filledUnits;
+    if(currentMode === 'delivery' && remainingUnits > 0 && remainingUnits <= 1){
+      showToast(`⚠️ تبقّى أقل من منصة واحدة لإكمال هذه العملية (${formatTons(remainingUnits)} منصة)`);
+    } else {
+      showToast(bags > 0 ? `✅ تم تسجيل ${bags} كيس سائب` : '✅ تم تسجيل المنصة');
+    }
   }
+  });
 }
 
 function undoLast(){
+  withLock(() => {
   const ctx = currentContext();
   if(!ctx || !ctx.entries || ctx.entries.length === 0) return;
   if(currentMode === 'receiving'){
@@ -607,10 +779,13 @@ function undoLast(){
       if(d){ d.entries.pop(); d.completedAt = null; }
     });
     renderDeliverySelect();
+    renderFileInfo();
   }
   renderCounterArea();
   renderTally();
+  updateGlobalLogSummary();
   showToast('↩️ تم التراجع عن آخر تسجيل');
+  });
 }
 
 // ----- File info card -----
@@ -627,7 +802,7 @@ function renderFileInfo(){
     file.prodDate ? `تاريخ الإنتاج: <b>${file.prodDate}</b>${file.expiryDate ? ' · الصلاحية حتى: <b>'+file.expiryDate+'</b>' : ''}` : '',
     `الكمية المتعاقد عليها: <b>${formatTons(file.contractedQty)}</b> طن`,
     `الكمية المتبقية المتاحة للتسليم: <b>${formatTons(remainingForDelivery(file))}</b> طن`,
-    `عدد الأكياس: <b>${file.totalBags||'—'}</b> · عدد المنصات: <b>${targetR || '—'}</b> (${file.bagsPerPallet} كيس/منصة × ${file.bagWeight} كغ = ${formatTons(pw)} طن/منصة)`,
+    `عدد الأكياس: <b>${file.totalBags||'—'}</b> · عدد المنصات الكاملة: <b>${targetR || '—'}</b>${looseBagsOf(file) > 0 ? ' + <b>'+looseBagsOf(file)+'</b> كيس سائب' : ''} (${file.bagsPerPallet} كيس/منصة × ${file.bagWeight} كغ = ${formatTons(pw)} طن/منصة)`,
     (file.lotsCount || (file.expectedLots||[]).length) ? `عدد الحصص: <b>${file.lotsCount || (file.expectedLots||[]).length}</b>${(file.expectedLots||[]).length ? ' — أرقامها: <b>'+file.expectedLots.join(', ')+'</b>' : ''}` : ''
   ].filter(Boolean);
   el.innerHTML = lines.map(l => `<div class="info-line">${l}</div>`).join('');
@@ -642,6 +817,127 @@ function renderWorkspace(){
 }
 
 // ----- Excel export -----
+// ----- Global operations log (across all files) -----
+function buildGlobalLog(){
+  const files = loadFiles();
+  const rows = [];
+  files.forEach(f => {
+    const pw = palletWeight(f);
+    const bagW = (parseFloat(f.bagWeight)||25)/1000;
+    (f.receiving.entries||[]).forEach(e => {
+      const qty = e.bags ? roundTo3(e.bags*bagW) : pw;
+      rows.push({ type: 'استلام', fileNumber: f.fileNumber, customer: '', lot: e.lot,
+        units: e.bags ? `${e.bags} كيس سائب` : '1 منصة', qtyTons: qty, ts: e.ts });
+    });
+    (f.deliveries||[]).forEach(d => {
+      (d.entries||[]).forEach(e => {
+        const qty = e.bags ? roundTo3(e.bags*bagW) : pw;
+        rows.push({ type: 'تسليم', fileNumber: f.fileNumber, customer: d.customerName||'', lot: e.lot,
+          units: e.bags ? `${e.bags} كيس سائب` : '1 منصة', qtyTons: qty, ts: e.ts });
+      });
+    });
+  });
+  rows.sort((a,b) => a.ts - b.ts);
+  return rows;
+}
+function getLogFilters(){
+  const fromVal = document.getElementById('logFromDate').value;
+  const toVal = document.getElementById('logToDate').value;
+  const fileVal = document.getElementById('logFileFilter').value.trim();
+  const fromTs = fromVal ? new Date(fromVal + 'T00:00:00').getTime() : null;
+  const toTs = toVal ? new Date(toVal + 'T23:59:59').getTime() : null;
+  return { fromTs, toTs, fileVal };
+}
+function applyLogFilters(rows){
+  const { fromTs, toTs, fileVal } = getLogFilters();
+  return rows.filter(r => {
+    if(fromTs !== null && r.ts < fromTs) return false;
+    if(toTs !== null && r.ts > toTs) return false;
+    if(fileVal && !String(r.fileNumber).includes(fileVal)) return false;
+    return true;
+  });
+}
+function updateGlobalLogSummary(){
+  const el = document.getElementById('globalLogSummary');
+  if(!el) return;
+  const rows = applyLogFilters(buildGlobalLog());
+  const totalTons = roundTo3(rows.reduce((s,r) => s + r.qtyTons, 0));
+  el.textContent = rows.length === 0
+    ? 'لا توجد عمليات مطابقة.'
+    : `عدد العمليات: ${rows.length} · إجمالي الوزن: ${formatTons(totalTons)} طن`;
+}
+async function exportGlobalLog(){
+  const rows = applyLogFilters(buildGlobalLog());
+  if(rows.length === 0){ showToast('⚠️ لا توجد عمليات مطابقة للفلترة الحالية'); return; }
+  showToast('⏳ يتم تجهيز سجل العمليات...');
+  try{ await loadXLSXLibrary(); }catch(e){ showToast('⚠️ تعذر تحميل مكتبة Excel — تحقق من الاتصال'); return; }
+  const out = [['نوع العملية','رقم الملف','الزبون','رقم الحصة','الوحدة','الوزن (طن)','التاريخ والوقت']];
+  rows.forEach(r => out.push([r.type, r.fileNumber, r.customer, r.lot, r.units, r.qtyTons, new Date(r.ts).toLocaleString('fr-FR')]));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(out), 'سجل العمليات الكامل');
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  XLSX.writeFile(wb, `سجل_عمليات_حاسبة_الحصص_${stamp}.xlsx`);
+  showToast('✅ تم تصدير سجل العمليات الكامل');
+}
+
+// ----- Self backup (export/import this app's own data) -----
+const LAST_BACKUP_KEY = 'lots_calc_last_backup_v1';
+function exportOwnBackup(){
+  const files = loadFiles();
+  if(files.length === 0){ showToast('⚠️ لا توجد ملفات لتصديرها'); return; }
+  const payload = { app: 'lots-calculator', exportedAt: Date.now(), files };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = new Date().toISOString().slice(0,19).replace(/[:T]/g,'-');
+  a.href = url; a.download = `نسخة_احتياطية_حاسبة_الحصص_${stamp}.json`;
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+  localStorage.setItem(LAST_BACKUP_KEY, String(Date.now()));
+  checkBackupReminder();
+  showToast('✅ تم تصدير النسخة الاحتياطية');
+}
+function restoreOwnBackup(event){
+  const file = event.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const data = JSON.parse(reader.result);
+      const incoming = Array.isArray(data.files) ? data.files : (Array.isArray(data) ? data : null);
+      if(!incoming) throw new Error('invalid');
+      askConfirmation(() => {
+        const current = loadFiles();
+        const byId = new Map(current.map(f => [f.id, f]));
+        incoming.forEach(f => byId.set(f.id, f));
+        saveFiles(Array.from(byId.values()));
+        renderFileSelect();
+        showToast(`✅ تم استرجاع ${incoming.length} ملف من النسخة الاحتياطية`);
+      }, `سيتم دمج ${incoming.length} ملف من النسخة الاحتياطية مع بياناتك الحالية (الملفات بنفس المعرف تُستبدَل). هل تريد المتابعة؟`);
+    }catch(e){
+      showToast('⚠️ ملف النسخة الاحتياطية غير صالح');
+    }
+    event.target.value = '';
+  };
+  reader.readAsText(file);
+}
+function checkBackupReminder(){
+  const el = document.getElementById('backupReminder');
+  if(!el) return;
+  const last = parseInt(localStorage.getItem(LAST_BACKUP_KEY)) || 0;
+  const days = last ? Math.floor((Date.now()-last)/86400000) : null;
+  if(loadFiles().length === 0){ el.style.display = 'none'; return; }
+  if(days === null){
+    el.style.display = 'block';
+    el.textContent = '⚠️ ما درتش نسخة احتياطية لهذا التطبيق بعد — يُنصح بتصديرها الآن حماية لبياناتك.';
+  } else if(days >= 7){
+    el.style.display = 'block';
+    el.textContent = `⚠️ آخر نسخة احتياطية كانت قبل ${days} يوم — يُنصح بتصدير نسخة جديدة.`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
 function loadXLSXLibrary(){
   return new Promise((resolve, reject) => {
     if(window.XLSX){ resolve(); return; }
@@ -670,8 +966,10 @@ async function exportExcel(){
     ['اسم الباخرة', file.shipName || ''],
     ['تاريخ وصول الباخرة', file.arrivalDate || ''],
     ['الكمية المتعاقد عليها (طن)', roundTo3(file.contractedQty)],
+    ['الكمية المتبقية المتاحة للتسليم (طن)', remainingForDelivery(file)],
     ['عدد الأكياس الإجمالي', file.totalBags || ''],
-    ['عدد المنصات الإجمالي (مستهدف)', targetPalletsReceiving(file)],
+    ['عدد المنصات الكاملة (مستهدف)', targetPalletsReceiving(file)],
+    ['عدد الأكياس السائبة (غير مكتملة منصة)', looseBagsOf(file)],
     ['عدد الأكياس في المنصة', file.bagsPerPallet],
     ['وزن الكيس (كغ)', file.bagWeight],
     ['وزن المنصة (طن)', pw],
@@ -865,71 +1163,6 @@ async function mergeLotsReports(event){
 
   resultEl.innerHTML = `<div style="color:var(--accent);font-weight:700;">✅ تم دمج ${filesList.length} ملف/ملفات وتنزيل التقرير الجامع</div><div>📁 ملفات: ${fileInfoMap.size} · 📥 سطور استلام: ${recvMap.size} · 📤 سطور تسليم: ${delivMap.size}</div>`;
   event.target.value = '';
-}
-
-// ----- Full workflow simulation (isolated demo file, never touches real data) -----
-function runFullSimulation(){
-  const powderType = Math.random() < 0.5 ? '0%' : '26%';
-  const bagsPerPallet = 56;
-  const bagWeight = 25;
-  const expectedLots = ['101','102','103','104','105'];
-  const demoFile = {
-    id: genId(), powderType, fileNumber: 'محاكاة-تجريبية-' + Date.now(),
-    prodDate: '', expiryDate: '', contractNumber: 'SIM-TEST', shipName: 'باخرة تجريبية (محاكاة)', arrivalDate: '',
-    contractedQty: 50, totalBags: 0, totalPallets: 30, bagsPerPallet, bagWeight,
-    lotsCount: expectedLots.length, expectedLots,
-    receiving: { entries: [] }, deliveries: [], isSimulation: true
-  };
-  const list = loadFiles();
-  list.push(demoFile);
-  saveFiles(list);
-
-  const target = targetPalletsReceiving(demoFile);
-  const recvEntries = [];
-  for(let i = 0; i < target; i++){
-    const lot = expectedLots[Math.floor(Math.random() * expectedLots.length)];
-    recvEntries.push({ lot, ts: Date.now() + i });
-  }
-  const deliveries = [];
-  const half = Math.max(1, Math.floor(target / 2));
-  ['زبون تجريبي أ', 'زبون تجريبي ب'].forEach((customer, idx) => {
-    const tgt = idx === 0 ? half : Math.max(1, target - half);
-    const entries = [];
-    for(let i = 0; i < tgt; i++){
-      const lot = expectedLots[Math.floor(Math.random() * expectedLots.length)];
-      entries.push({ lot, ts: Date.now() + 10000 + i });
-    }
-    deliveries.push({
-      id: genId(), customerName: customer, targetPallets: tgt,
-      targetTons: roundTo3(tgt * palletWeight(demoFile)),
-      createdAt: Date.now(), completedAt: Date.now(), entries
-    });
-  });
-
-  updateFile(demoFile.id, f => { f.receiving.entries = recvEntries; f.deliveries = deliveries; });
-
-  currentFileId = demoFile.id;
-  localStorage.setItem(LAST_FILE_KEY, currentFileId);
-  currentMode = 'receiving';
-  currentDeliveryId = '';
-  renderFileSelect();
-  document.getElementById('fileSelect').value = currentFileId;
-  renderWorkspace();
-  showToast('🧪 تم إنشاء وتشغيل محاكاة تجريبية كاملة (استلام + تسليم لزبونين) — جرّب التصدير ثم احذفها لاحقاً');
-}
-
-function deleteAllSimulations(){
-  const list = loadFiles();
-  const remaining = list.filter(f => !f.isSimulation);
-  const removedCount = list.length - remaining.length;
-  saveFiles(remaining);
-  if(currentFileId && !remaining.some(f => f.id === currentFileId)){
-    currentFileId = '';
-    localStorage.removeItem(LAST_FILE_KEY);
-    document.getElementById('workspace').style.display = 'none';
-  }
-  renderFileSelect();
-  showToast(removedCount > 0 ? `🗑️ تم حذف ${removedCount} ملف محاكاة` : 'لا توجد ملفات محاكاة لحذفها');
 }
 
 // ----- Toast -----
