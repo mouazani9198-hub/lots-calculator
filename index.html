@@ -4623,7 +4623,8 @@ function copyGcCodeToClipboard() {
 
 function unlockCentralGenerator() {
   const code = prompt("🔑 يرجى إدخال الرمز السري للإدارة المركزية بالجزائر العاصمة لفتح أداة التوليد:");
-  if (code === "ALGER_ONIL_CENTRAL") {
+  const cleanCode = code ? code.trim().toUpperCase() : "";
+  if (cleanCode === "ALGER_ONIL_CENTRAL" || cleanCode === "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ") {
     document.getElementById('generatorLockScreen').style.display = 'none';
     document.getElementById('algiersGeneratorContainer').style.display = 'block';
     showToast("🔓 تم فتح منشئ رموز التخصيص بنجاح!");
