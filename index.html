@@ -5387,7 +5387,8 @@ function exportAllToExcelActual() {
     const wb = XLSX.utils.book_new();
 
     // 1. Sheet 1: الملفات والمخازن (Files & Real Stock)
-    const filesData = list.map(f => {
+    let filesData = [];
+    list.forEach(f => {
       const pw = palletWeight(f);
       let recTons = 0;
       (f.receiving.entries || []).forEach(e => {
@@ -5415,39 +5416,55 @@ function exportAllToExcelActual() {
         });
       });
       
-      // Split lots text into keys and quantities separately to align with specific column requests
-      let lotsNames = [];
-      let lotsQuantities = [];
+      const availableLots = Object.keys(lotMap).filter(lot => lotMap[lot] > 0.001);
       
-      Object.keys(lotMap).forEach(lot => {
-        if(lotMap[lot] > 0.001) {
-          lotsNames.push(lot);
-          lotsQuantities.push(`${lotMap[lot].toFixed(3)} طن`);
-        }
-      });
-      
-      let lotsNamesStr = lotsNames.join(' \n');
-      let lotsQuantitiesStr = lotsQuantities.join(' \n');
-        
-      if (lotsNames.length === 0) {
-        lotsNamesStr = "لا توجد حصص متبقية";
-        lotsQuantitiesStr = "0.000 طن";
+      if (availableLots.length === 0) {
+        filesData.push({
+          "رقم الملف / BL": f.fileNumber,
+          "نوع البودرة": f.powderType + " دسم",
+          "المستودع": f.warehouse || "سعيدة 1",
+          "المورد": f.supplier,
+          "رقم العقد": f.contractNumber,
+          "أرقام الحصص (Lots) المتوفرة في المخزن": "لا توجد حصص متبقية",
+          "الرصيد الفعلي للحصة (طن)": 0,
+          "الكمية المتعاقد عليها (طن)": f.contractedQty,
+          "المستلم الفعلي (طن)": recTons,
+          "المسلم الكلي (طن)": delTons,
+          "إجمالي الرصيد المتاح (طن)": remainingTons
+        });
+      } else {
+        availableLots.forEach((lot, index) => {
+          if (index === 0) {
+            filesData.push({
+              "رقم الملف / BL": f.fileNumber,
+              "نوع البودرة": f.powderType + " دسم",
+              "المستودع": f.warehouse || "سعيدة 1",
+              "المورد": f.supplier,
+              "رقم العقد": f.contractNumber,
+              "أرقام الحصص (Lots) المتوفرة في المخزن": lot,
+              "الرصيد الفعلي للحصة (طن)": parseFloat(lotMap[lot].toFixed(3)),
+              "الكمية المتعاقد عليها (طن)": f.contractedQty,
+              "المستلم الفعلي (طن)": recTons,
+              "المسلم الكلي (طن)": delTons,
+              "إجمالي الرصيد المتاح (طن)": remainingTons
+            });
+          } else {
+            filesData.push({
+              "رقم الملف / BL": f.fileNumber,
+              "نوع البودرة": f.powderType + " دسم",
+              "المستودع": "",
+              "المورد": "",
+              "رقم العقد": "",
+              "أرقام الحصص (Lots) المتوفرة في المخزن": lot,
+              "الرصيد الفعلي للحصة (طن)": parseFloat(lotMap[lot].toFixed(3)),
+              "الكمية المتعاقد عليها (طن)": "",
+              "المستلم الفعلي (طن)": "",
+              "المسلم الكلي (طن)": "",
+              "إجمالي الرصيد المتاح (طن)": ""
+            });
+          }
+        });
       }
-
-      return {
-        "رقم الملف / BL": f.fileNumber,
-        "نوع البودرة": f.powderType,
-        "أرقام الحصص (Lots) المتوفرة في المخزن": lotsNamesStr,
-        "الرصيد الفعلي للحصة (طن)": lotsQuantitiesStr,
-        "الكمية المتعاقد عليها (طن)": f.contractedQty,
-        "المستلم الفعلي (طن)": recTons,
-        "المسلم الكلي (طن)": delTons,
-        "إجمالي الرصيد المتاح (طن)": remainingTons,
-        "المستودع": f.warehouse || "سعيدة 1",
-        "المورد": f.supplier,
-        "رقم العقد": f.contractNumber,
-        "تاريخ العقد": f.contractDate
-      };
     });
     const wsFiles = XLSX.utils.json_to_sheet(filesData);
     XLSX.utils.book_append_sheet(wb, wsFiles, "حالة الملفات والمخازن");
@@ -5635,5 +5652,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f36cd2897a6ea',t:'MTc4NTY5NjA1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f5023c939b93b',t:'MTc4NTY5NzA5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
