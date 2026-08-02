@@ -1854,10 +1854,10 @@ tr:hover {
 
 <!-- --- RECEIPTS HISTORY MODAL --- -->
 <div id="receiptsHistoryModal" class="modal-overlay">
-  <div class="modal-content" style="max-width: 600px;">
+  <div class="modal-box" style="max-width: 600px;">
     <div class="modal-header">
-      <h2><i class="fa-solid fa-file-invoice"></i> سجل الوصولات السابقة (لإعادة الطباعة)</h2>
-      <span class="modal-close" onclick="closeModal('receiptsHistoryModal')">&times;</span>
+      <i class="fa-solid fa-file-invoice" style="color: var(--fb-blue); font-size: 22px;"></i>
+      <span>سجل الوصولات السابقة (لإعادة الطباعة)</span>
     </div>
     <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
       <div style="font-size: 11px; opacity: 0.8; margin-bottom: 10px; line-height: 1.5;">
@@ -1876,6 +1876,9 @@ tr:hover {
           <!-- Rendered dynamically -->
         </tbody>
       </table>
+    </div>
+    <div class="modal-footer" style="justify-content: center;">
+      <button class="btn btn-secondary" onclick="document.getElementById('receiptsHistoryModal').classList.remove('active')">إغلاق النافذة</button>
     </div>
   </div>
 </div>
@@ -4421,6 +4424,10 @@ function openReceiptsHistoryModal() {
   if(currentMode === 'receiving') {
     checkpoints = file.receivingCheckpoints || [];
   } else {
+    if (!currentDeliveryId) {
+      showToast("⚠️ يرجى تحديد الزبون النشط لعرض وصولات التسليم الخاصة به!");
+      return;
+    }
     const d = file.deliveries.find(x => x.id === currentDeliveryId);
     if (d) checkpoints = d.checkpoints || [];
   }
@@ -4450,7 +4457,7 @@ function openReceiptsHistoryModal() {
       tbody.appendChild(tr);
     });
   }
-  document.getElementById('receiptsHistoryModal').style.display = 'flex';
+  document.getElementById('receiptsHistoryModal').classList.add('active');
 }
 
 async function reprintCheckpoint(cpIndex) {
@@ -5677,5 +5684,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f5ee32a15d4da',t:'MTc4NTY5NzcwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f7ea15a7f3805',t:'MTc4NTY5OTAwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
