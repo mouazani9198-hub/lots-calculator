@@ -1168,14 +1168,17 @@ tr:hover {
 
        <!-- Added Photo Capture and Voice capture field (التعرف الضوئي التلقائي OCR والإدخال الصوتي للحصة) -->
        <div class="field">
-         <label>الإدخال الذكي للحصة (بالتصوير الكاميرا أو بالإملاء الصوتي المباشر)</label>
+         <label>الإدخال الذكي للحصة (OCR الكاميرا، الباركود، أو الإملاء الصوتي)</label>
          <div style="display:flex; gap:10px; align-items:center;">
            <input type="file" id="ocrCameraInput" accept="image/*" capture="camera" style="display:none;" onchange="runOCR(this)">
            <button type="button" class="btn btn-secondary" onclick="document.getElementById('ocrCameraInput').click()" style="flex:1;">
              <i class="fa-solid fa-camera-retro"></i> تصوير الحصة (OCR)
            </button>
+           <button type="button" class="btn btn-secondary" onclick="startBarcodeScanner()" style="flex:1;">
+             <i class="fa-solid fa-barcode"></i> مسح باركود (Barcode)
+           </button>
            <button type="button" class="btn btn-primary" onclick="startVoiceLotInput()" style="flex:1; background-color:var(--fb-blue); border-color:var(--fb-blue);">
-             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت (Voice)
+             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت
            </button>
          </div>
        </div>
@@ -2078,6 +2081,20 @@ tr:hover {
   </div>
 </div>
 
+<!-- --- BARCODE SCANNER MODAL --- -->
+<div id="barcodeModal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 400px; padding: 0;">
+    <div class="modal-header" style="padding: 15px;">
+      <h2><i class="fa-solid fa-barcode"></i> مسح الباركود / QR</h2>
+      <span class="modal-close" onclick="closeBarcodeModal()">&times;</span>
+    </div>
+    <div class="modal-body" style="text-align: center; padding: 0; background: #000;">
+      <div id="barcode-reader" style="width: 100%; min-height: 250px;"></div>
+      <div style="font-size:11px; margin:10px; color:#fff; opacity:0.8;">وجه الكاميرا نحو الباركود لقرائته تلقائياً</div>
+    </div>
+  </div>
+</div>
+
 <!-- --- OCR AUTOMATED LOT CONFIRM MODAL (النافذة الذكية للتعرف الضوئي) --- -->
 <div id="ocrModal" class="modal-overlay">
   <div class="modal-box" style="border: 2px solid var(--fb-blue); box-shadow: 0 4px 20px rgba(47, 143, 212, 0.2);">
@@ -2558,6 +2575,62 @@ async function runOCR(input) {
     img.src = e.target.result;
   };
   reader.readAsDataURL(file);
+}
+
+// --- BARCODE / QR SCANNER FEATURE ---
+let html5QrcodeScanner = null;
+
+function loadBarcodeLibrary() {
+  return new Promise((resolve, reject) => {
+    if(window.Html5QrcodeScanner) { resolve(); return; }
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('تعذر تحميل مكتبة الباركود'));
+    document.head.appendChild(s);
+  });
+}
+
+async function startBarcodeScanner() {
+  showToast("⏳ جاري تشغيل الكاميرا لمسح الباركود...");
+  try { 
+    await loadBarcodeLibrary(); 
+  } catch(e) { 
+    showToast("⚠️ تعذر تحميل مكتبة الباركود - تأكد من اتصالك بالإنترنت"); 
+    return; 
+  }
+  
+  document.getElementById('barcodeModal').style.display = 'flex';
+  
+  if(!html5QrcodeScanner) {
+    html5QrcodeScanner = new Html5QrcodeScanner(
+      "barcode-reader", 
+      { fps: 10, qrbox: {width: 250, height: 100} },
+      /* verbose= */ false
+    );
+  }
+  
+  html5QrcodeScanner.render((decodedText, decodedResult) => {
+    // On success
+    html5QrcodeScanner.clear();
+    document.getElementById('barcodeModal').style.display = 'none';
+    
+    // Announce the scanned number using text-to-speech for worker confirmation
+    speakLotNumber(decodedText);
+    
+    ocrDetectedLot = decodedText;
+    document.getElementById('quickLotNumber').value = decodedText;
+    openOcrModal(decodedText);
+  }, (error) => {
+    // Ignore frame errors
+  });
+}
+
+function closeBarcodeModal() {
+  document.getElementById('barcodeModal').style.display = 'none';
+  if (html5QrcodeScanner) {
+    html5QrcodeScanner.clear().catch(e => console.error(e));
+  }
 }
 
 // --- VOICE RECOGNITION FOR LOT INPUT USING WEB SPEECH API ---
@@ -4262,9 +4335,13 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
       </div>
     </div>
     
-    <!-- Secure Audit Hash for Tamper Prevention -->
-    <div style="margin-top: 15px; text-align: center; font-size: 11px; font-family: monospace; color: #333; border-top: 1px dashed #C7D8E8; padding-top: 5px; direction: ltr;">
-      🔒 الرمز الأمني للتحقق ومنع التلاعب (Secure Verification Code): <span style="font-weight: 900; color: #000; font-size: 13px; border: 1px solid #000; padding: 2px 6px; border-radius: 4px; background-color: #f2f2f2 !important;">${generateSecureAuditHash(file.fileNumber, numberSeq, finalNetWeight)}</span>
+    <!-- Secure Audit Hash and QR Code for Tamper Prevention -->
+    <div style="margin-top: 15px; border-top: 1px dashed #C7D8E8; padding-top: 10px; display: flex; align-items: center; justify-content: space-between; direction: ltr;">
+      <div id="invoiceQRCodeBox_${numberSeq}" style="width: 75px; height: 75px; padding: 2px; background: #fff;"></div>
+      <div style="text-align: right; font-size: 11px; font-family: monospace; color: #333;">
+        <div style="font-weight: bold; margin-bottom: 5px;">🔒 الرمز الأمني للتحقق (Secure Verification Code):</div>
+        <div style="font-weight: 900; color: #000; font-size: 13px; border: 1px solid #000; padding: 2px 6px; border-radius: 4px; background-color: #f2f2f2 !important; display: inline-block;">${generateSecureAuditHash(file.fileNumber, numberSeq, finalNetWeight)}</div>
+      </div>
     </div>
     
     <!-- Added Official EPIC ONIL Footer Details safely as requested -->
@@ -4276,20 +4353,37 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
 
 async function loadPDFLibraries(){
   return new Promise((resolve, reject) => {
-    if(window.html2canvas && window.jspdf){ resolve(); return; }
-    const s1 = document.createElement('script');
-    s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-    s1.crossOrigin = 'anonymous';
-    s1.onload = () => {
+    let loaded = 0;
+    const checkDone = () => { loaded++; if(loaded === 3) resolve(); };
+
+    if(window.html2canvas && window.jspdf && window.QRCode){ resolve(); return; }
+    
+    if(!window.html2canvas) {
+      const s1 = document.createElement('script');
+      s1.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s1.crossOrigin = 'anonymous';
+      s1.onload = checkDone;
+      s1.onerror = () => reject(new Error('تعذر تحميل html2canvas'));
+      document.head.appendChild(s1);
+    } else checkDone();
+
+    if(!window.jspdf) {
       const s2 = document.createElement('script');
       s2.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
       s2.crossOrigin = 'anonymous';
-      s2.onload = () => resolve();
-      s2.onerror = () => reject(new Error('تعذر تحميل مكتبة jspdf'));
+      s2.onload = checkDone;
+      s2.onerror = () => reject(new Error('تعذر تحميل jspdf'));
       document.head.appendChild(s2);
-    };
-    s1.onerror = () => reject(new Error('تعذر تحميل مكتبة html2canvas'));
-    document.head.appendChild(s1);
+    } else checkDone();
+
+    if(!window.QRCode) {
+      const s3 = document.createElement('script');
+      s3.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
+      s3.crossOrigin = 'anonymous';
+      s3.onload = checkDone;
+      s3.onerror = () => reject(new Error('تعذر تحميل qrcode'));
+      document.head.appendChild(s3);
+    } else checkDone();
   });
 }
 
@@ -4383,6 +4477,20 @@ async function closeBatchAndPrint() {
 
     // Build finalized non-draft printed HTML
     document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, entries, title, formattedSeq, false);
+    
+    // Generate QR Code
+    const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, calculatedTotal);
+    const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${calculatedTotal.toFixed(3)} | Hash: ${hash}`;
+    try {
+      new QRCode(document.getElementById(`invoiceQRCodeBox_${formattedSeq}`), {
+        text: qrText,
+        width: 75,
+        height: 75,
+        colorDark : "#000000",
+        colorLight : "#ffffff",
+        correctLevel : QRCode.CorrectLevel.L
+      });
+    } catch(err) { console.error("QR Error", err); }
     
     // Save checkpoint to database/localStorage so these entries are locked completely (قفل العملية تماماً ولا تفتح مجدداً)
     updateFile(currentFileId, f => {
@@ -4503,6 +4611,20 @@ async function reprintCheckpoint(cpIndex) {
 
   const formattedSeq = currCp.seq || "000";
   document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false);
+  
+  // Generate QR Code
+  const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, currCp.tons || 0);
+  const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${(currCp.tons || 0).toFixed(3)} | Hash: ${hash}`;
+  try {
+    new QRCode(document.getElementById(`invoiceQRCodeBox_${formattedSeq}`), {
+      text: qrText,
+      width: 75,
+      height: 75,
+      colorDark : "#000000",
+      colorLight : "#ffffff",
+      correctLevel : QRCode.CorrectLevel.L
+    });
+  } catch(err) { console.error("QR Error", err); }
 
   const filenamePrefix = `${prefixName}_${file.fileNumber}_Seq${formattedSeq}`;
   
@@ -5570,6 +5692,40 @@ function exportAllToExcelActual() {
     XLSX.utils.sheet_add_json(wsSituation, situationData, { origin: "A3" });
 
     XLSX.utils.book_append_sheet(wb, wsSituation, "situation du stock");
+    
+    // 4. Sheet 4: تقرير التلف والأكياس الممزقة (Torn Bags Audit)
+    const tornData = [];
+    list.forEach(f => {
+      let totalPF = 0; // returned to supplier
+      let totalPM = 0; // given to customer
+      let tornWeightDeduction = 0;
+
+      (f.receiving.entries || []).forEach(e => {
+        const pfVal = parseFloat(e.pf) || 0;
+        const pmVal = parseFloat(e.pm) || 0;
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+        totalPF += pfVal;
+        totalPM += pmVal;
+        tornWeightDeduction += (pfVal + pmVal) * singleBagW;
+      });
+
+      if (totalPF > 0 || totalPM > 0) {
+        tornData.push({
+          "المورد": f.supplier || "—",
+          "رقم الملف / BL": f.fileNumber,
+          "المستودع": f.warehouse || "سعيدة 1",
+          "نوع البودرة": f.powderType + " دسم",
+          "إرجاع للمورد (PF) - كيس": totalPF,
+          "مسلم للملبنة (PM) - كيس": totalPM,
+          "إجمالي الوزن المهدور/الممزق (طن)": tornWeightDeduction
+        });
+      }
+    });
+
+    if (tornData.length > 0) {
+      const wsTorn = XLSX.utils.json_to_sheet(tornData);
+      XLSX.utils.book_append_sheet(wb, wsTorn, "تقرير التلف والأكياس الممزقة");
+    }
 
     XLSX.writeFile(wb, `تقرير_ERP_المستودعات_الشامل_${Date.now()}.xlsx`);
     showToast("💚 تم تصدير ملف Excel الشامل بنجاح!");
@@ -5578,5 +5734,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c36cfad53282d',t:'MTc4NTY2NDYwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c54a6ff4dba8d',t:'MTc4NTY2NTgyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
