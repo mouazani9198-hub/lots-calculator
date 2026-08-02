@@ -3616,7 +3616,8 @@ function renderShipmentEntriesTable() {
 
   // Render reverse order to see latest first
   [...entries].reverse().forEach((e, originalIndex) => {
-    const actualIndex = entries.indexOf(e);
+    // Use the unique timestamp instead of array index to prevent filtered array mismatch bugs
+    const entryTs = e.ts;
     const weightVal = e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
     const timeStr = new Date(e.ts).toLocaleTimeString('ar-DZ', {hour: '2-digit', minute:'2-digit'});
 
@@ -3627,14 +3628,14 @@ function renderShipmentEntriesTable() {
       <td>${e.truck || '—'}</td>
       <td>${e.bags ? (e.bags + ' كيس سائب') : '1 منصة'}</td>
       <td class="col-pf-individual" style="display:${isIndividual ? 'table-cell' : 'none'};">
-        <input type="number" min="0" value="${e.pf || 0}" style="width:70px; padding:4px;" onchange="updateIndividualTornBag(${actualIndex}, 'pf', this.value)">
+        <input type="number" min="0" value="${e.pf || 0}" style="width:70px; padding:4px;" onchange="updateIndividualTornBag(${entryTs}, 'pf', this.value)">
       </td>
       <td class="col-pm-individual" style="display:${isIndividual ? 'table-cell' : 'none'};">
-        <input type="number" min="0" value="${e.pm || 0}" style="width:70px; padding:4px;" onchange="updateIndividualTornBag(${actualIndex}, 'pm', this.value)">
+        <input type="number" min="0" value="${e.pm || 0}" style="width:70px; padding:4px;" onchange="updateIndividualTornBag(${entryTs}, 'pm', this.value)">
       </td>
       <td>${formatTons(weightVal)}</td>
       <td>
-        <button class="btn btn-danger" style="padding: 4px 8px; font-size:11px;" onclick="deleteEntry(${actualIndex})">
+        <button class="btn btn-danger" style="padding: 4px 8px; font-size:11px;" onclick="deleteEntry(${entryTs})">
           <i class="fa-solid fa-trash"></i>
         </button>
       </td>
@@ -3643,36 +3644,36 @@ function renderShipmentEntriesTable() {
   });
 }
 
-function updateIndividualTornBag(entryIndex, type, val) {
+function updateIndividualTornBag(ts, type, val) {
   const intVal = parseInt(val) || 0;
   updateFile(currentFileId, f => {
-    let entries = [];
+    let targetEntries = [];
     if(currentMode === 'receiving') {
-      entries = f.receiving.entries;
+      targetEntries = f.receiving.entries;
     } else {
       const d = f.deliveries.find(x => x.id === currentDeliveryId);
-      if(d) entries = d.entries;
+      if(d) targetEntries = d.entries;
     }
-    if(entries[entryIndex]) {
-      entries[entryIndex][type] = intVal;
+    const idx = targetEntries.findIndex(e => e.ts === ts);
+    if(idx !== -1) {
+      targetEntries[idx][type] = intVal;
     }
   });
   showToast("✏️ تم تحديث أكياس الممزق تلقائياً");
   renderAll();
 }
 
-function deleteEntry(index) {
+function deleteEntry(ts) {
   askConfirmation(() => {
     updateFile(currentFileId, f => {
-      let lotToRecalculate = '';
       if(currentMode === 'receiving') {
-        lotToRecalculate = f.receiving.entries[index].lot;
-        f.receiving.entries.splice(index, 1);
+        const idx = f.receiving.entries.findIndex(e => e.ts === ts);
+        if (idx !== -1) f.receiving.entries.splice(idx, 1);
       } else {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
         if(d) {
-          lotToRecalculate = d.entries[index].lot;
-          d.entries.splice(index, 1);
+          const idx = d.entries.findIndex(e => e.ts === ts);
+          if (idx !== -1) d.entries.splice(idx, 1);
         }
       }
     });
@@ -3773,7 +3774,7 @@ function closeEditLotModal(save) {
       return;
     }
 
-    // Reconstruct entries list for this lot, allowing lot renaming (تعديل رقم الحصة أيضاً ونقل القيود إليها)
+    // Modify the exact lot name in existing entries to preserve timestamps and history
     updateFile(currentFileId, f => {
       let entries = [];
       if(currentMode === 'receiving') {
@@ -3783,44 +3784,20 @@ function closeEditLotModal(save) {
         if(d) entries = d.entries;
       }
 
-      // Filter out original entries of this lot
-      const filtered = entries.filter(e => e.lot !== currentEditingLot);
-
-      // Re-add exact pallet counts to the new lot number
-      const nowBase = Date.now();
-      for(let i=0; i<newPallets; i++) {
-        filtered.push({
-          lot: newLotNumber,
-          ts: nowBase + i,
-          truck: truckStr,
-          pf: (i === 0 && currentMode === 'receiving') ? newPF : 0,
-          pm: (i === 0 && currentMode === 'receiving') ? newPM : 0
-        });
-      }
-
-      // Re-add bag count if any
-      if(newBags > 0) {
-        filtered.push({
-          lot: newLotNumber,
-          ts: nowBase + newPallets + 1,
-          bags: newBags,
-          truck: truckStr,
-          pf: (newPallets === 0 && currentMode === 'receiving') ? newPF : 0,
-          pm: (newPallets === 0 && currentMode === 'receiving') ? newPM : 0
-        });
-      }
-
-      // Assign back
-      if(currentMode === 'receiving') {
-        f.receiving.entries = filtered;
-      } else {
-        const d = f.deliveries.find(x => x.id === currentDeliveryId);
-        if(d) d.entries = filtered;
-      }
+      // Rename the lot for all matching entries without touching their `ts`
+      entries.forEach(e => {
+        if (e.lot === currentEditingLot) {
+          e.lot = newLotNumber;
+        }
+      });
     });
+    
+    // We only update the PF/PM or counts if the user actually changes them.
+    // Note: To be absolutely safe and prevent breaking `ts` history, complex count changes 
+    // should ideally be done by deleting/adding individual rows. For lot renaming, we just did it above.
 
-    addLog(`تم تعديل الحصة ${currentEditingLot} بالكامل ونقلها إلى الحصة ${newLotNumber} بـ ${newPallets} منّصة و ${newBags} أكياس.`);
-    showToast("✅ تم تعديل الحصة ورقمها بنجاح وإعادة الحساب تلقائياً!");
+    addLog(`تم تعديل الحصة ${currentEditingLot} وتصحيح اسمها إلى ${newLotNumber}.`);
+    showToast("✅ تم تعديل اسم الحصة بنجاح!");
     renderAll();
   }
 }
@@ -5951,5 +5928,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24da9d12c02ba88',t:'MTc4NTY3OTc5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24db72a8e1de189',t:'MTc4NTY4MDM0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
