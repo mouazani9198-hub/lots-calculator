@@ -5249,10 +5249,33 @@ function exportAllToExcelActual() {
         });
       });
       const remainingTons = Math.max(0, recTons - delTons);
+      
+      // Calculate remaining quantities per Lot number for this specific file
+      const lotMap = {};
+      (f.receiving.entries || []).forEach(e => {
+        if (!e.lot) return;
+        if (!lotMap[e.lot]) lotMap[e.lot] = 0;
+        lotMap[e.lot] += entryWeight(e, f);
+      });
+      (f.deliveries || []).forEach(d => {
+        (d.entries || []).forEach(e => {
+          if (!e.lot) return;
+          if (lotMap[e.lot] !== undefined) lotMap[e.lot] -= entryWeight(e, f);
+        });
+      });
+      
+      // Format lots text (e.g., "Lot123: 5.000 طن | Lot456: 12.000 طن")
+      let lotsDetails = Object.keys(lotMap)
+        .filter(lot => lotMap[lot] > 0.001)
+        .map(lot => `${lot}: ${lotMap[lot].toFixed(3)} طن`)
+        .join('  |  ');
+        
+      if (!lotsDetails) lotsDetails = "لا يوجد أرقام حصص متبقية";
 
       return {
         "رقم الملف / BL": f.fileNumber,
         "نوع البودرة": f.powderType,
+        "تفصيل أرقام الحصص (Lots) المتوفرة في المخزن": lotsDetails,
         "الكمية المتعاقد عليها (طن)": f.contractedQty,
         "المستلم الفعلي (طن)": recTons,
         "المسلم الكلي (طن)": delTons,
@@ -5415,5 +5438,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24bf2f3faaeba93',t:'MTc4NTY2MTgyMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c08b8dfb32833',t:'MTc4NTY2MjcxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
