@@ -2094,7 +2094,7 @@ tr:hover {
       <h2><i class="fa-solid fa-barcode"></i> مسح الباركود / QR</h2>
       <span class="modal-close" onclick="closeBarcodeModal()">&times;</span>
     </div>
-    <div class="modal-body" style="text-align: center; padding: 0; background: #000;">
+    <div class="modal-body" style="text-align: center; padding: 0; background: #000; position: relative;">
       <div id="barcode-reader" style="width: 100%; min-height: 250px;"></div>
       <div style="font-size:11px; margin:10px; color:#fff; opacity:0.8;">وجه الكاميرا نحو الباركود لقرائته تلقائياً</div>
     </div>
@@ -2588,7 +2588,7 @@ let globalScannerInstance = null;
 
 function loadBarcodeLibrary() {
   return new Promise((resolve, reject) => {
-    if(window.Html5QrcodeScanner) { resolve(); return; }
+    if(window.Html5Qrcode) { resolve(); return; }
     const s = document.createElement('script');
     s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js';
     s.onload = () => resolve();
@@ -2600,7 +2600,11 @@ function loadBarcodeLibrary() {
 function stopCurrentScanner() {
   if (globalScannerInstance) {
     try {
-      globalScannerInstance.clear();
+      globalScannerInstance.stop().then(() => {
+        globalScannerInstance.clear();
+      }).catch(e => {
+        globalScannerInstance.clear();
+      });
     } catch(e) {}
     globalScannerInstance = null;
   }
@@ -2613,20 +2617,26 @@ async function startBarcodeScanner() {
   stopCurrentScanner();
   document.getElementById('barcodeModal').style.display = 'flex';
   
-  globalScannerInstance = new Html5QrcodeScanner(
-    "barcode-reader", 
-    { fps: 10, qrbox: {width: 250, height: 100} },
-    false
-  );
-  
-  globalScannerInstance.render((decodedText, decodedResult) => {
-    stopCurrentScanner();
+  try {
+    globalScannerInstance = new Html5Qrcode("barcode-reader");
+    await globalScannerInstance.start(
+      { facingMode: "environment" }, 
+      { fps: 10, qrbox: {width: 250, height: 150} },
+      (decodedText, decodedResult) => {
+        stopCurrentScanner();
+        document.getElementById('barcodeModal').style.display = 'none';
+        speakLotNumber(decodedText);
+        ocrDetectedLot = decodedText;
+        document.getElementById('quickLotNumber').value = decodedText;
+        openOcrModal(decodedText);
+      },
+      (errorMessage) => {}
+    );
+  } catch(err) {
+    console.error("Camera Error:", err);
     document.getElementById('barcodeModal').style.display = 'none';
-    speakLotNumber(decodedText);
-    ocrDetectedLot = decodedText;
-    document.getElementById('quickLotNumber').value = decodedText;
-    openOcrModal(decodedText);
-  }, (error) => {});
+    showAlertModal("⚠️ تعذر الوصول للكاميرا. الرجاء التأكد من الأذونات وأن المتصفح يدعم هذه الخاصية.");
+  }
 }
 
 function closeBarcodeModal() {
@@ -4805,43 +4815,49 @@ async function startAuditBarcodeScanner() {
   stopCurrentScanner();
   document.getElementById('barcodeModal').style.display = 'flex';
   
-  globalScannerInstance = new Html5QrcodeScanner(
-    "barcode-reader", 
-    { fps: 10, qrbox: {width: 250, height: 250} },
-    false
-  );
-  
-  globalScannerInstance.render((decodedText, decodedResult) => {
-    stopCurrentScanner();
-    document.getElementById('barcodeModal').style.display = 'none';
-    
-    if (decodedText.startsWith("ONIL_VERIFY")) {
-      const parts = decodedText.split('|').map(p => p.trim());
-      try {
-        const fileNum = parts[1].replace('BL:', '').trim();
-        const seqNum = parts[2].replace('Seq:', '').trim();
-        const netTons = parseFloat(parts[3].replace('NetTons:', '').trim());
-        const hash = parts[4].replace('Hash:', '').trim();
+  try {
+    globalScannerInstance = new Html5Qrcode("barcode-reader");
+    await globalScannerInstance.start(
+      { facingMode: "environment" }, 
+      { fps: 10, qrbox: {width: 250, height: 250} },
+      (decodedText, decodedResult) => {
+        stopCurrentScanner();
+        document.getElementById('barcodeModal').style.display = 'none';
         
-        document.getElementById('auditFileNumber').value = fileNum;
-        document.getElementById('auditSeqNumber').value = seqNum;
-        document.getElementById('auditNetWeight').value = netTons;
-        
-        runSecurityAuditVerifier();
-        
-        const calculatedHash = document.getElementById('auditGeneratedHash').textContent;
-        if (calculatedHash === hash) {
-          showAlertModal(`✅ <b>الوصل أصلي وسليم 100%!</b><br><br>تم التحقق بنجاح من الشفرة. لا يوجد أي تلاعب في الأوزان.<br><br><b>الوزن الصافي المعتمد:</b> ${netTons.toFixed(3)} طن`);
+        if (decodedText.startsWith("ONIL_VERIFY")) {
+          const parts = decodedText.split('|').map(p => p.trim());
+          try {
+            const fileNum = parts[1].replace('BL:', '').trim();
+            const seqNum = parts[2].replace('Seq:', '').trim();
+            const netTons = parseFloat(parts[3].replace('NetTons:', '').trim());
+            const hash = parts[4].replace('Hash:', '').trim();
+            
+            document.getElementById('auditFileNumber').value = fileNum;
+            document.getElementById('auditSeqNumber').value = seqNum;
+            document.getElementById('auditNetWeight').value = netTons;
+            
+            runSecurityAuditVerifier();
+            
+            const calculatedHash = document.getElementById('auditGeneratedHash').textContent;
+            if (calculatedHash === hash) {
+              showAlertModal(`✅ <b>الوصل أصلي وسليم 100%!</b><br><br>تم التحقق بنجاح من الشفرة. لا يوجد أي تلاعب في الأوزان.<br><br><b>الوزن الصافي المعتمد:</b> ${netTons.toFixed(3)} طن`);
+            } else {
+              showAlertModal(`🛑 <b>تنبيه أمني خطير! الوصل مزور!</b><br><br>البيانات المطبوعة على الوصل لا تتطابق مع الشفرة السرية الخاصة به. يرجى إيقاف الشاحنة فوراً!`);
+            }
+          } catch (e) {
+            showAlertModal("⚠️ يبدو أن رمز الـ QR تالف أو غير مقروء بشكل صحيح.");
+          }
         } else {
-          showAlertModal(`🛑 <b>تنبيه أمني خطير! الوصل مزور!</b><br><br>البيانات المطبوعة على الوصل لا تتطابق مع الشفرة السرية الخاصة به. يرجى إيقاف الشاحنة فوراً!`);
+          showAlertModal("⚠️ هذا الرمز ليس رمز تحقق رسمي صادر من ديوان ONIL.");
         }
-      } catch (e) {
-        showAlertModal("⚠️ يبدو أن رمز الـ QR تالف أو غير مقروء بشكل صحيح.");
-      }
-    } else {
-      showAlertModal("⚠️ هذا الرمز ليس رمز تحقق رسمي صادر من ديوان ONIL.");
-    }
-  }, (error) => {});
+      },
+      (errorMessage) => {}
+    );
+  } catch(err) {
+    console.error("Camera Error:", err);
+    document.getElementById('barcodeModal').style.display = 'none';
+    showAlertModal("⚠️ تعذر الوصول للكاميرا. الرجاء التأكد من الأذونات وأن المتصفح يدعم هذه الخاصية.");
+  }
 }
 
 // --- PWA NATIVE INSTALL CONTROL ---
@@ -5781,5 +5797,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c70baa969282f',t:'MTc4NTY2Njk3Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c94c0ab542831',t:'MTc4NTY2ODQ0OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
