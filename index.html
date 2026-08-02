@@ -1168,17 +1168,14 @@ tr:hover {
 
        <!-- Added Photo Capture and Voice capture field (التعرف الضوئي التلقائي OCR والإدخال الصوتي للحصة) -->
        <div class="field">
-         <label>الإدخال الذكي للحصة (OCR الكاميرا، الباركود، أو الإملاء الصوتي)</label>
+         <label>الإدخال الذكي للحصة (بالتصوير الكاميرا أو بالإملاء الصوتي المباشر)</label>
          <div style="display:flex; gap:10px; align-items:center;">
            <input type="file" id="ocrCameraInput" accept="image/*" capture="camera" style="display:none;" onchange="runOCR(this)">
            <button type="button" class="btn btn-secondary" onclick="document.getElementById('ocrCameraInput').click()" style="flex:1;">
              <i class="fa-solid fa-camera-retro"></i> تصوير الحصة (OCR)
            </button>
-           <button type="button" class="btn btn-secondary" onclick="startBarcodeScanner()" style="flex:1;">
-             <i class="fa-solid fa-barcode"></i> مسح باركود (Barcode)
-           </button>
            <button type="button" class="btn btn-primary" onclick="startVoiceLotInput()" style="flex:1; background-color:var(--fb-blue); border-color:var(--fb-blue);">
-             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت
+             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت (Voice)
            </button>
          </div>
        </div>
@@ -1785,13 +1782,7 @@ tr:hover {
       <div style="line-height: 1.6; font-size: 13px; margin-bottom: 15px; opacity: 0.95; border-bottom: 1px dashed var(--border-current); padding-bottom: 10px;">
         أخي العون المكلف بالحراسة والرقابة في البوابة الرئيسية للديوان:
         <br>
-        استخدم كاميرا الهاتف لمسح الرمز المربع (QR Code) الموجود أسفل الوصل لقرائته فوراً، أو أدخل البيانات يدوياً للتأكد من مطابقة الوزن السليم وحماية الديوان من أي تزوير.
-      </div>
-
-      <div style="margin-bottom: 15px;">
-        <button class="btn btn-primary" onclick="startAuditBarcodeScanner()" style="width: 100%; background-color: #000; border-color: #000; padding: 12px; font-size: 14px;">
-          <i class="fa-solid fa-qrcode" style="font-size: 18px; margin-left: 5px;"></i> مسح رمز الوصل الذكي (QR Scanner) بالكاميرا
-        </button>
+        يرجى نقل البيانات الثلاثة المكتوبة بالوصل الورقي (سند الخروج أو الاستلام) الذي يحمله السائق وأدخلها هنا للتأكد الفوري من مطابقة الوزن السليم وحماية الديوان من أي تزوير أو تلاعب بالأوزان، بالكامل <b>دون الحاجة للإنترنت</b>.
       </div>
       
       <div class="form-row" style="display: grid; grid-template-columns: 1fr; gap: 12px;">
@@ -2083,20 +2074,6 @@ tr:hover {
     <div class="modal-footer">
       <button class="btn btn-secondary" onclick="closeEditCustomerModal(false)">إلغاء</button>
       <button class="btn btn-primary" onclick="closeEditCustomerModal(true)" style="background-color: var(--fb-blue); border-color: var(--fb-blue);">حفظ كواطة الزبون</button>
-    </div>
-  </div>
-</div>
-
-<!-- --- BARCODE SCANNER MODAL --- -->
-<div id="barcodeModal" class="modal-overlay">
-  <div class="modal-content" style="max-width: 400px; padding: 0;">
-    <div class="modal-header" style="padding: 15px;">
-      <h2><i class="fa-solid fa-barcode"></i> مسح الباركود / QR</h2>
-      <span class="modal-close" onclick="closeBarcodeModal()">&times;</span>
-    </div>
-    <div class="modal-body" style="text-align: center; padding: 0; background: #000; position: relative;">
-      <div id="barcode-reader" style="width: 100%; min-height: 250px;"></div>
-      <div style="font-size:11px; margin:10px; color:#fff; opacity:0.8;">وجه الكاميرا نحو الباركود لقرائته تلقائياً</div>
     </div>
   </div>
 </div>
@@ -2641,6 +2618,7 @@ async function startBarcodeScanner() {
         console.log("Could not enumerate cameras, falling back to default environment mode", cameraErr);
       }
       
+      // Safe fallback wrapper for Oppo/Realme start failure
       globalScannerInstance.start(
         config, 
         { fps: 10, qrbox: {width: 250, height: 150} },
@@ -2654,9 +2632,28 @@ async function startBarcodeScanner() {
         },
         (errorMessage) => {}
       ).catch(err => {
-        console.error("Camera Error:", err);
-        document.getElementById('barcodeModal').style.display = 'none';
-        showAlertModal("⚠️ تعذر الوصول للكاميرا. تأكد أن المتصفح يمتلك الصلاحية ولا يوجد تطبيق آخر يستخدم الكاميرا حالياً.");
+        console.error("Camera Config Error, falling back to simple mode:", err);
+        // If Oppo rejects the specific config, fall back to pure library default
+        try {
+          globalScannerInstance.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: {width: 250, height: 150} },
+            (decodedText, decodedResult) => {
+              stopCurrentScanner();
+              document.getElementById('barcodeModal').style.display = 'none';
+              speakLotNumber(decodedText);
+              ocrDetectedLot = decodedText;
+              document.getElementById('quickLotNumber').value = decodedText;
+              openOcrModal(decodedText);
+            },
+            (errorMessage) => {}
+          ).catch(e => {
+            document.getElementById('barcodeModal').style.display = 'none';
+            showAlertModal("⚠️ الكاميرا قيد الاستخدام من تطبيق آخر أو تم رفض الإذن من النظام. يرجى مسح متصفح Chrome من الخلفية والمحاولة مجدداً.");
+          });
+        } catch(e) {
+          document.getElementById('barcodeModal').style.display = 'none';
+        }
       });
     } catch(err) {
       console.error("Camera Init Error:", err);
@@ -4859,6 +4856,7 @@ async function startAuditBarcodeScanner() {
         }
       } catch(cameraErr) {}
       
+      // Safe fallback wrapper for Oppo/Realme start failure
       globalScannerInstance.start(
         config, 
         { fps: 10, qrbox: {width: 250, height: 250} },
@@ -4895,9 +4893,49 @@ async function startAuditBarcodeScanner() {
         },
         (errorMessage) => {}
       ).catch(err => {
-        console.error("Camera Error:", err);
-        document.getElementById('barcodeModal').style.display = 'none';
-        showAlertModal("⚠️ تعذر الوصول للكاميرا. تأكد أن المتصفح يمتلك الصلاحية.");
+        console.error("Camera Config Error, falling back to simple mode:", err);
+        try {
+          globalScannerInstance.start(
+            { facingMode: "environment" }, 
+            { fps: 10, qrbox: {width: 250, height: 250} },
+            (decodedText, decodedResult) => {
+              stopCurrentScanner();
+              document.getElementById('barcodeModal').style.display = 'none';
+              if (decodedText.startsWith("ONIL_VERIFY")) {
+                const parts = decodedText.split('|').map(p => p.trim());
+                try {
+                  const fileNum = parts[1].replace('BL:', '').trim();
+                  const seqNum = parts[2].replace('Seq:', '').trim();
+                  const netTons = parseFloat(parts[3].replace('NetTons:', '').trim());
+                  const hash = parts[4].replace('Hash:', '').trim();
+                  
+                  document.getElementById('auditFileNumber').value = fileNum;
+                  document.getElementById('auditSeqNumber').value = seqNum;
+                  document.getElementById('auditNetWeight').value = netTons;
+                  
+                  runSecurityAuditVerifier();
+                  
+                  const calculatedHash = document.getElementById('auditGeneratedHash').textContent;
+                  if (calculatedHash === hash) {
+                    showAlertModal(`✅ <b>الوصل أصلي وسليم 100%!</b><br><br>تم التحقق بنجاح من الشفرة. لا يوجد أي تلاعب في الأوزان.<br><br><b>الوزن الصافي المعتمد:</b> ${netTons.toFixed(3)} طن`);
+                  } else {
+                    showAlertModal(`🛑 <b>تنبيه أمني خطير! الوصل مزور!</b><br><br>البيانات المطبوعة على الوصل لا تتطابق مع الشفرة السرية الخاصة به. يرجى إيقاف الشاحنة فوراً!`);
+                  }
+                } catch (e) {
+                  showAlertModal("⚠️ يبدو أن رمز الـ QR تالف أو غير مقروء بشكل صحيح.");
+                }
+              } else {
+                showAlertModal("⚠️ هذا الرمز ليس رمز تحقق رسمي صادر من ديوان ONIL.");
+              }
+            },
+            (errorMessage) => {}
+          ).catch(e => {
+            document.getElementById('barcodeModal').style.display = 'none';
+            showAlertModal("⚠️ الكاميرا قيد الاستخدام من تطبيق آخر أو تم رفض الإذن من النظام. يرجى مسح متصفح Chrome من الخلفية والمحاولة مجدداً.");
+          });
+        } catch(e) {
+          document.getElementById('barcodeModal').style.display = 'none';
+        }
       });
     } catch(err) {
       console.error("Camera Error:", err);
@@ -5843,5 +5881,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24cca170cb26cb8',t:'MTc4NTY3MDYzNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
