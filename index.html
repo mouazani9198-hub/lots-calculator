@@ -1168,14 +1168,13 @@ tr:hover {
 
        <!-- Added Photo Capture and Voice capture field (التعرف الضوئي التلقائي OCR والإدخال الصوتي للحصة) -->
        <div class="field">
-         <label>الإدخال الذكي للحصة (بالتصوير الكاميرا أو بالإملاء الصوتي المباشر)</label>
+         <label>الإدخال الذكي للحصة (مسح الباركود السريع أو الإملاء الصوتي)</label>
          <div style="display:flex; gap:10px; align-items:center;">
-           <input type="file" id="ocrCameraInput" accept="image/*" capture="camera" style="display:none;" onchange="runOCR(this)">
-           <button type="button" class="btn btn-secondary" onclick="document.getElementById('ocrCameraInput').click()" style="flex:1;">
-             <i class="fa-solid fa-camera-retro"></i> تصوير الحصة (OCR)
+           <button type="button" class="btn btn-secondary" onclick="startBarcodeScanner()" style="flex:1;">
+             <i class="fa-solid fa-barcode"></i> مسح باركود (QR)
            </button>
            <button type="button" class="btn btn-primary" onclick="startVoiceLotInput()" style="flex:1; background-color:var(--fb-blue); border-color:var(--fb-blue);">
-             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت (Voice)
+             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت
            </button>
          </div>
        </div>
@@ -2439,20 +2438,8 @@ function getLotsTally(entries, file) {
   return tally;
 }
 
-// --- DYNAMIC AI OCR CAMERA SCANNING FOR GOODS WITHOUT BARCODE ---
-function loadTesseract() {
-  return new Promise((resolve, reject) => {
-    if(window.Tesseract) { resolve(); return; }
-    const s = document.createElement('script');
-    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js';
-    s.crossOrigin = 'anonymous';
-    s.onload = () => resolve();
-    s.onerror = () => reject(new Error('تعذر تحميل مكتبة قارئ الذكاء الاصطناعي Tesseract'));
-    document.head.appendChild(s);
-  });
-}
+  // Use Voice fallback helper function since Tesseract is removed
 
-// Voice confirmation helper using Web Speech API digit-by-digit in Algerian Arabic (التأكيد اللفظي الصوتي رقماً برقم)
 function speakLotNumber(lot) {
   if ('speechSynthesis' in window) {
     // Split to read digit by digit for extreme forklift worker clarity
@@ -2478,92 +2465,7 @@ function speakLotNumber(lot) {
   }
 }
 
-async function runOCR(input) {
-  const file = input.files[0];
-  if(!file) return;
 
-  showToast("🔍 جاري المعالجة الذكية للصورة واستخراج رقم الحصة...");
-  
-  const reader = new FileReader();
-  reader.onload = function(e) {
-    const img = new Image();
-    img.onload = function() {
-      // 1. Advanced Scaling: Increase resolution slightly for thin fonts, but not too huge to crash the browser
-      const canvas = document.createElement('canvas');
-      // 800px provides a great balance for reading labels covered in plastic wrap
-      let targetWidth = 800; 
-      if (img.width < 800) targetWidth = img.width; // Don't upscale small images too much
-      
-      canvas.width = targetWidth;
-      canvas.height = Math.round(img.height * targetWidth / img.width);
-      
-      const ctx = canvas.getContext('2d');
-      // Smoothing helps with glare and plastic wrap reflection
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = 'high';
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      
-      // 2. Grayscale & Contrast Enhancement (NO harsh binarization that deletes thin numbers)
-      try {
-        const d = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        for (let i = 0; i < d.data.length; i += 4) {
-          // Convert to pure grayscale
-          const gray = 0.299 * d.data[i] + 0.587 * d.data[i+1] + 0.114 * d.data[i+2];
-          
-          // Enhance contrast algorithmically (making darks darker and lights lighter, without wiping data)
-          let contrast = (gray - 128) * 1.5 + 128;
-          if (contrast < 0) contrast = 0;
-          if (contrast > 255) contrast = 255;
-          
-          d.data[i] = d.data[i+1] = d.data[i+2] = contrast;
-        }
-        ctx.putImageData(d, 0, 0);
-      } catch(err) { console.error('Image enhancement failed:', err); }
-
-      // Use PNG for lossless text quality passed to Tesseract
-      const enhancedUrl = canvas.toDataURL('image/png');
-
-      Tesseract.recognize(
-        enhancedUrl,
-        'eng',
-        {
-          // Whitelist numbers and uppercase letters (sometimes lots have letters like 'A', 'B')
-          tessedit_char_whitelist: '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ-', 
-          // psm 11: Sparse text. Find as much text as possible in no particular order.
-          // Excellent for labels surrounded by random logos/graphics
-          tessedit_pageseg_mode: '11', 
-          logger: m => console.log(m)
-        }
-      ).then(({ data: { text } }) => {
-        console.log('Tesseract OCR Deep Scan Text:', text);
-        
-        // Find the longest sequence of alphanumeric characters that contains at least 4 digits
-        // This regex looks for combinations of uppercase letters and numbers, ensuring it captures trailing letters like 'A', 'B'
-        const matches = text.match(/[A-Z0-9-]*\d{4,15}[A-Z0-9-]*/g); 
-        
-        if(matches && matches.length > 0) {
-          // Sort matches by length descending, assume the longest alphanumeric string is the LOT number
-          matches.sort((a, b) => b.length - a.length);
-          // Clean any trailing or leading hyphens that might have been accidentally read
-          const detectedLot = matches[0].replace(/^-|-$/g, '');
-          
-          ocrDetectedLot = detectedLot;
-          document.getElementById('quickLotNumber').value = detectedLot;
-          
-          // Open dedicated prompt dialog to ask for pallet count
-          openOcrModal(detectedLot);
-        } else {
-          showAlertModal("⚠️ لم نتمكن من تحديد رقم حصة واضح في الصورة تلقائياً. يرجى كتابة رقم الحصة يدوياً أو التقاط صورة قريبة في ضوء جيد.");
-        }
-      }).catch(err => {
-        console.error(err);
-        showToast("⚠️ فشل مسح الحصة ضوئياً.");
-      });
-    };
-    img.src = e.target.result;
-  };
-  reader.readAsDataURL(file);
-}
 
 // --- BARCODE / QR SCANNER FEATURE ---
 let globalScannerInstance = null;
@@ -2634,6 +2536,7 @@ async function startBarcodeScanner() {
           ocrDetectedLot = decodedText;
           document.getElementById('quickLotNumber').value = decodedText;
           openOcrModal(decodedText);
+          renderSuggestedChips(); // Auto-filter lots list
         },
         (errorMessage) => {}
       ).catch(err => {
@@ -2647,9 +2550,12 @@ async function startBarcodeScanner() {
               stopCurrentScanner();
               document.getElementById('barcodeModal').style.display = 'none';
               speakLotNumber(decodedText);
+              
+              // Simulate what OCR used to do: capture the text, put it in the input, and open the confirmation Modal
               ocrDetectedLot = decodedText;
               document.getElementById('quickLotNumber').value = decodedText;
               openOcrModal(decodedText);
+              renderSuggestedChips(); // Auto-filter lots list
             },
             (errorMessage) => {}
           ).catch(e => {
@@ -2743,7 +2649,7 @@ function parseSpokenLot(text) {
   const mapping = {
     'صفر': '0', 'واحد': '1', 'إثنان': '2', 'اثنين': '2', 'ثلاثة': '3', 'تلاتة': '3',
     'أربعة': '4', 'ربعة': '4', 'خمسة': '5', 'ستة': '6', 'سبعة': '7', 'ثمانية': '8',
-    'تمانية': '8', 'تسعة': '9', 'إي': 'E', 'e': 'E', 'أي': 'A', 'a': 'A', 'بي': 'B', 'b': 'B'
+    'تمانية': '8', 'تسعة': '9', 'إي': 'E', 'e': 'E', 'أي': 'A', 'a': 'A', 'أ': 'A', 'بي': 'B', 'b': 'B'
   };
 
   let result = '';
@@ -5947,5 +5853,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24efef71a7ce177',t:'MTc4NTY5Mzc3MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f15dbebda4777',t:'MTc4NTY5NDcwOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
