@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
@@ -1785,7 +1786,13 @@ tr:hover {
       <div style="line-height: 1.6; font-size: 13px; margin-bottom: 15px; opacity: 0.95; border-bottom: 1px dashed var(--border-current); padding-bottom: 10px;">
         أخي العون المكلف بالحراسة والرقابة في البوابة الرئيسية للديوان:
         <br>
-        يرجى نقل البيانات الثلاثة المكتوبة بالوصل الورقي (سند الخروج أو الاستلام) الذي يحمله السائق وأدخلها هنا للتأكد الفوري من مطابقة الوزن السليم وحماية الديوان من أي تزوير أو تلاعب بالأوزان، بالكامل <b>دون الحاجة للإنترنت</b>.
+        استخدم كاميرا الهاتف لمسح الرمز المربع (QR Code) الموجود أسفل الوصل لقرائته فوراً، أو أدخل البيانات يدوياً للتأكد من مطابقة الوزن السليم وحماية الديوان من أي تزوير.
+      </div>
+
+      <div style="margin-bottom: 15px;">
+        <button class="btn btn-primary" onclick="startAuditBarcodeScanner()" style="width: 100%; background-color: #000; border-color: #000; padding: 12px; font-size: 14px;">
+          <i class="fa-solid fa-qrcode" style="font-size: 18px; margin-left: 5px;"></i> مسح رمز الوصل الذكي (QR Scanner) بالكاميرا
+        </button>
       </div>
       
       <div class="form-row" style="display: grid; grid-template-columns: 1fr; gap: 12px;">
@@ -2630,6 +2637,9 @@ function closeBarcodeModal() {
   document.getElementById('barcodeModal').style.display = 'none';
   if (html5QrcodeScanner) {
     html5QrcodeScanner.clear().catch(e => console.error(e));
+  }
+  if (html5QrcodeScannerAudit) {
+    html5QrcodeScannerAudit.clear().catch(e => console.error(e));
   }
 }
 
@@ -4787,7 +4797,7 @@ function runSecurityAuditVerifier() {
 
   const resultDiv = document.getElementById('auditGeneratedHash');
   if(!fileNum || !seqNum || netWeight <= 0) {
-    resultDiv.textContent = '— أدخل البيانات أعلاه للتحقق —';
+    resultDiv.textContent = '— أدخل البيانات أعلاه أو امسح الباركود للتحقق —';
     resultDiv.style.color = '#777';
     return;
   }
@@ -4795,6 +4805,61 @@ function runSecurityAuditVerifier() {
   const generatedHash = generateSecureAuditHash(fileNum, seqNum, netWeight, auditDateVal);
   resultDiv.textContent = generatedHash;
   resultDiv.style.color = 'var(--fb-green)';
+}
+
+let html5QrcodeScannerAudit = null;
+
+async function startAuditBarcodeScanner() {
+  showToast("⏳ جاري تشغيل الكاميرا لمسح باركود الوصل...");
+  try { 
+    await loadBarcodeLibrary(); 
+  } catch(e) { 
+    showToast("⚠️ تعذر تحميل مكتبة الباركود - تأكد من اتصالك بالإنترنت"); 
+    return; 
+  }
+  
+  document.getElementById('barcodeModal').style.display = 'flex';
+  
+  if(!html5QrcodeScannerAudit) {
+    html5QrcodeScannerAudit = new Html5QrcodeScanner(
+      "barcode-reader", 
+      { fps: 10, qrbox: {width: 250, height: 250} },
+      /* verbose= */ false
+    );
+  }
+  
+  html5QrcodeScannerAudit.render((decodedText, decodedResult) => {
+    // Expected format: ONIL_VERIFY | BL: 1234 | Seq: 001 | NetTons: 25.000 | Hash: ONIL-1234-001-A1B2C3
+    html5QrcodeScannerAudit.clear();
+    document.getElementById('barcodeModal').style.display = 'none';
+    
+    if (decodedText.startsWith("ONIL_VERIFY")) {
+      const parts = decodedText.split('|').map(p => p.trim());
+      try {
+        const fileNum = parts[1].replace('BL:', '').trim();
+        const seqNum = parts[2].replace('Seq:', '').trim();
+        const netTons = parseFloat(parts[3].replace('NetTons:', '').trim());
+        const hash = parts[4].replace('Hash:', '').trim();
+        
+        document.getElementById('auditFileNumber').value = fileNum;
+        document.getElementById('auditSeqNumber').value = seqNum;
+        document.getElementById('auditNetWeight').value = netTons;
+        
+        runSecurityAuditVerifier();
+        
+        const calculatedHash = document.getElementById('auditGeneratedHash').textContent;
+        if (calculatedHash === hash) {
+          showAlertModal(`✅ <b>الوصل أصلي وسليم 100%!</b><br><br>تم التحقق بنجاح من الشفرة. لا يوجد أي تلاعب في الأوزان.<br><br><b>الوزن الصافي المعتمد:</b> ${netTons.toFixed(3)} طن`);
+        } else {
+          showAlertModal(`🛑 <b>تنبيه أمني خطير! الوصل مزور!</b><br><br>البيانات المطبوعة على الوصل لا تتطابق مع الشفرة السرية الخاصة به. يرجى إيقاف الشاحنة فوراً!`);
+        }
+      } catch (e) {
+        showAlertModal("⚠️ يبدو أن رمز الـ QR تالف أو غير مقروء بشكل صحيح.");
+      }
+    } else {
+      showAlertModal("⚠️ هذا الرمز ليس رمز تحقق رسمي صادر من ديوان ONIL.");
+    }
+  }, (error) => {});
 }
 
 // --- PWA NATIVE INSTALL CONTROL ---
@@ -5734,5 +5799,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c54a6ff4dba8d',t:'MTc4NTY2NTgyMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c5e4ff928ba93',t:'MTc4NTY2NjIxOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
