@@ -1918,32 +1918,35 @@ tr:hover {
   <div class="modal-box">
     <div class="modal-header">
       <i class="fa-solid fa-pen-to-square" style="color: var(--fb-blue); font-size: 22px;"></i>
-      <span>تعديل الحصة بالكامل وإعادة احتساب الأوزان</span>
+      <span>تعديل اسم أو رقم الحصة (إعادة تسمية)</span>
     </div>
     <div class="modal-body">
       <div class="field">
-        <label>رقم الحصة (قابل للتعديل والنقل)</label>
+        <label>رقم الحصة (اكتب الاسم أو الرقم الجديد الصحيح)</label>
         <input type="text" id="editLotNumber" style="font-weight:bold; border-color: var(--fb-blue);">
       </div>
       <div class="form-row">
         <div class="field">
           <label>العدد الإجمالي للمنصات</label>
-          <input type="number" id="editLotPallets" min="0">
+          <input type="number" id="editLotPallets" min="0" disabled style="background:#eee; opacity:0.7;">
         </div>
         <div class="field">
           <label>الأكياس السائبة الإضافية</label>
-          <input type="number" id="editLotLooseBags" min="0">
+          <input type="number" id="editLotLooseBags" min="0" disabled style="background:#eee; opacity:0.7;">
         </div>
       </div>
       <div class="form-row">
         <div class="field" id="editLotPFField">
           <label>أكياس ممزقة مورد (PF)</label>
-          <input type="number" id="editLotPF" min="0">
+          <input type="number" id="editLotPF" min="0" disabled style="background:#eee; opacity:0.7;">
         </div>
         <div class="field" id="editLotPMField">
           <label>أكياس ممزقة عامل (PM)</label>
-          <input type="number" id="editLotPM" min="0">
+          <input type="number" id="editLotPM" min="0" disabled style="background:#eee; opacity:0.7;">
         </div>
+      </div>
+      <div style="font-size: 11.5px; opacity: 0.8; margin-top: 5px; color: var(--fb-red); font-weight: bold;">
+        ⚠️ لتعديل أو حذف كميات الأكياس والمنصات، يرجى القيام بذلك من "جدول الدفعة الجارية" مباشرة لضمان عدم اختلال طوابع الوقت والأرصدة التراكمية.
       </div>
       <div class="field">
         <label>رقم الشاحنة الافتراضي</label>
@@ -5391,9 +5394,18 @@ function exportAllToExcelActual() {
     list.forEach(f => {
       const pw = palletWeight(f);
       let recTons = 0;
+      let totalTornDeduction = 0;
+
       (f.receiving.entries || []).forEach(e => {
         recTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
+        
+        // Calculate torn bags weight to deduct from received
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+        const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+        totalTornDeduction += entryTornW;
       });
+      recTons -= totalTornDeduction;
+
       let delTons = 0;
       (f.deliveries || []).forEach(d => {
         (d.entries || []).forEach(e => {
@@ -5407,7 +5419,12 @@ function exportAllToExcelActual() {
       (f.receiving.entries || []).forEach(e => {
         if (!e.lot) return;
         if (!lotMap[e.lot]) lotMap[e.lot] = 0;
-        lotMap[e.lot] += entryWeight(e, f);
+        
+        const entryW = entryWeight(e, f);
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+        const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+        
+        lotMap[e.lot] += (entryW - entryTornW);
       });
       (f.deliveries || []).forEach(d => {
         (d.entries || []).forEach(e => {
@@ -5527,7 +5544,11 @@ function exportAllToExcelActual() {
           // A. Initial quantity before Sunday (at start of the week)
           let recBefore = 0;
           (f.receiving.entries || []).forEach(e => {
-            if (e.ts < startTs) recBefore += e.bags ? (e.bags * bagW) : pw;
+            if (e.ts < startTs) {
+              const entryGross = e.bags ? (e.bags * bagW) : pw;
+              const entryTorn = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * ((parseFloat(e.tornBagWeight)||parseFloat(f.bagWeight)||25)/1000);
+              recBefore += (entryGross - entryTorn);
+            }
           });
           let delBefore = 0;
           (f.deliveries || []).forEach(d => {
@@ -5540,7 +5561,11 @@ function exportAllToExcelActual() {
           // B. Weekly Inputs (from Sunday 00:00 to Saturday 23:59)
           let inputsOfWeek = 0;
           (f.receiving.entries || []).forEach(e => {
-            if (e.ts >= startTs && e.ts <= endTs) inputsOfWeek += e.bags ? (e.bags * bagW) : pw;
+            if (e.ts >= startTs && e.ts <= endTs) {
+              const entryGross = e.bags ? (e.bags * bagW) : pw;
+              const entryTorn = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * ((parseFloat(e.tornBagWeight)||parseFloat(f.bagWeight)||25)/1000);
+              inputsOfWeek += (entryGross - entryTorn);
+            }
           });
 
           // C. Weekly Outputs (from Sunday 00:00 to Saturday 23:59)
@@ -5652,5 +5677,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f5023c939b93b',t:'MTc4NTY5NzA5Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f5ee32a15d4da',t:'MTc4NTY5NzcwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
