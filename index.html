@@ -2617,12 +2617,32 @@ async function startBarcodeScanner() {
   stopCurrentScanner();
   document.getElementById('barcodeModal').style.display = 'flex';
   
-  // Give UI a moment to render the modal before attaching camera to it
-  setTimeout(() => {
+  // Try to find the back camera specifically to avoid errors on some phones
+  setTimeout(async () => {
     try {
+      // Create instance first
       globalScannerInstance = new Html5Qrcode("barcode-reader");
+      
+      let config = { facingMode: "environment" }; // Safe default
+      
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length) {
+          // Find the back/rear camera. Oppo sometimes labels it "Camera 0, Facing back"
+          const backCamera = devices.find(d => d.label.toLowerCase().match(/back|rear|environnement|arrière/));
+          if (backCamera) {
+            config = { deviceId: { exact: backCamera.id } };
+          } else {
+            // Fallback to the last camera in list (often the back one on Android if not labeled clearly)
+            config = { deviceId: { exact: devices[devices.length - 1].id } };
+          }
+        }
+      } catch(cameraErr) {
+        console.log("Could not enumerate cameras, falling back to default environment mode", cameraErr);
+      }
+      
       globalScannerInstance.start(
-        { facingMode: "environment" }, 
+        config, 
         { fps: 10, qrbox: {width: 250, height: 150} },
         (decodedText, decodedResult) => {
           stopCurrentScanner();
@@ -4821,11 +4841,25 @@ async function startAuditBarcodeScanner() {
   stopCurrentScanner();
   document.getElementById('barcodeModal').style.display = 'flex';
   
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
       globalScannerInstance = new Html5Qrcode("barcode-reader");
+      
+      let config = { facingMode: "environment" };
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length) {
+          const backCamera = devices.find(d => d.label.toLowerCase().match(/back|rear|environnement|arrière/));
+          if (backCamera) {
+            config = { deviceId: { exact: backCamera.id } };
+          } else {
+            config = { deviceId: { exact: devices[devices.length - 1].id } };
+          }
+        }
+      } catch(cameraErr) {}
+      
       globalScannerInstance.start(
-        { facingMode: "environment" }, 
+        config, 
         { fps: 10, qrbox: {width: 250, height: 250} },
         (decodedText, decodedResult) => {
           stopCurrentScanner();
@@ -5808,5 +5842,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24ca7e23a219bff',t:'MTc4NTY2OTIzMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24cc07c1979ba84',t:'MTc4NTY3MDI0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
