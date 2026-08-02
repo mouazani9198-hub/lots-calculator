@@ -1785,11 +1785,11 @@ tr:hover {
         </div>
         <div class="field">
           <label style="color: var(--text-current); font-size:11px;">الرمز السري الحالي المفعّل (Old Secret Salt):</label>
-          <input type="text" id="cryptoOldSalt" readonly style="font-family: monospace; font-weight: bold; background-color: rgba(0,0,0,0.05); opacity: 0.8; padding: 6px 10px;">
+          <input type="password" id="cryptoOldSalt" readonly style="font-family: monospace; font-weight: bold; background-color: rgba(0,0,0,0.05); opacity: 0.8; padding: 6px 10px;">
         </div>
         <div class="field">
           <label style="font-weight: bold; color: var(--text-current); font-size:11px;">الرمز السري الجديد المطلوب تفعيله (New Secret Salt):</label>
-          <input type="text" id="cryptoNewSalt" placeholder="اكتب الرمز السري الجديد هنا..." style="font-family: monospace; font-weight: bold; border-color: var(--fb-blue); padding: 6px 10px;">
+          <input type="password" id="cryptoNewSalt" placeholder="اكتب الرمز السري الجديد هنا..." style="font-family: monospace; font-weight: bold; border-color: var(--fb-blue); padding: 6px 10px;">
         </div>
         <div style="display: flex; gap: 8px; margin-top: 12px;">
           <button class="btn btn-primary" onclick="rotateSecretSalt()" style="flex: 2; padding: 6px 12px; font-size: 11px; font-weight: bold; width: auto; min-height: unset; margin: 0; background-color: var(--fb-blue); border-color: var(--fb-blue);">
@@ -3063,14 +3063,51 @@ function renderSuggestedChips() {
 
   if(!file) return;
 
-  const lots = file.expectedLots || [];
-  lots.forEach(lot => {
-    if(!val || lot.includes(val)) {
+  let lotsToSuggest = [];
+  
+  if (currentMode === 'delivery') {
+    // Collect all lots that have some received stock physically in the warehouse
+    const receivedLotsStats = {};
+    
+    // Sum receiving
+    (file.receiving.entries || []).forEach(e => {
+      if (!e.lot) return;
+      receivedLotsStats[e.lot] = (receivedLotsStats[e.lot] || 0) + entryWeight(e, file);
+    });
+    
+    // Subtract delivered
+    (file.deliveries || []).forEach(d => {
+      (d.entries || []).forEach(e => {
+        if (!e.lot) return;
+        receivedLotsStats[e.lot] -= entryWeight(e, file);
+      });
+    });
+
+    Object.keys(receivedLotsStats).forEach(lot => {
+      const avail = receivedLotsStats[lot];
+      if (avail > 0.001) { // has physical stock
+         lotsToSuggest.push({ lot: lot, available: avail });
+      }
+    });
+  } else {
+    // In receiving mode, just show the expected lots from the contract
+    lotsToSuggest = (file.expectedLots || []).map(lot => ({ lot: lot, available: null }));
+  }
+
+  lotsToSuggest.forEach(item => {
+    if(!val || item.lot.includes(val)) {
       const chip = document.createElement('div');
       chip.className = 'chip';
-      chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${lot}`;
+      
+      if (currentMode === 'delivery' && item.available !== null) {
+        // Show real-time available stock for each lot to match the field precisely
+        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${item.lot} <span style="font-size:11px; font-weight:bold; color:var(--fb-red); margin-right:5px; background: rgba(255,0,0,0.1); padding: 2px 5px; border-radius: 4px;">(${formatTons(item.available)} طن متاح)</span>`;
+      } else {
+        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${item.lot}`;
+      }
+      
       chip.onclick = () => {
-        document.getElementById('quickLotNumber').value = lot;
+        document.getElementById('quickLotNumber').value = item.lot;
         renderSuggestedChips();
       };
       container.appendChild(chip);
@@ -5208,5 +5245,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a248abfd0f364912',t:'MTc4NTYyNzQ1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24922867f562834',t:'MTc4NTYzMjMxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
