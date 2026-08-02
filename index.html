@@ -3664,14 +3664,19 @@ function updateIndividualTornBag(entryIndex, type, val) {
 function deleteEntry(index) {
   askConfirmation(() => {
     updateFile(currentFileId, f => {
+      let lotToRecalculate = '';
       if(currentMode === 'receiving') {
+        lotToRecalculate = f.receiving.entries[index].lot;
         f.receiving.entries.splice(index, 1);
       } else {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
-        if(d) d.entries.splice(index, 1);
+        if(d) {
+          lotToRecalculate = d.entries[index].lot;
+          d.entries.splice(index, 1);
+        }
       }
     });
-    showToast("🗑️ تم حذف السجل بنجاح!");
+    showToast("🗑️ تم حذف السجل وتحديث جميع الأرصدة بنجاح!");
     addLog(`تم حذف أحد سجلات الشحنة.`);
     renderAll();
   }, "هل تريد حقاً حذف هذا السجل من القائمة؟");
@@ -5946,5 +5951,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24d730afce3881b',t:'MTc4NTY3NzU1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24da9d12c02ba88',t:'MTc4NTY3OTc5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
