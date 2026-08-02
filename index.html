@@ -1279,8 +1279,12 @@ tr:hover {
           <i class="fa-solid fa-file-excel"></i> تصدير كل شيء Excel
         </button>
         <button class="btn btn-secondary" onclick="triggerBackup()">
-          <i class="fa-solid fa-cloud-arrow-up"></i> نسخة احتياطية للبيانات
+          <i class="fa-solid fa-cloud-arrow-up"></i> استخراج نسخة احتياطية (JSON)
         </button>
+        <button class="btn btn-secondary" onclick="document.getElementById('restoreBackupInput').click()">
+          <i class="fa-solid fa-cloud-arrow-down"></i> استرجاع نسخة احتياطية
+        </button>
+        <input type="file" id="restoreBackupInput" style="display:none;" accept=".json" onchange="restoreBackup(event)">
         <button class="btn btn-secondary" onclick="adjustReceiptNumbering()">
           <i class="fa-solid fa-hashtag"></i> ضبط ترقيم الوصولات
         </button>
@@ -4353,12 +4357,43 @@ function printCurrentStatus() {
 // BACKUP, MERGE & INTEROP TOOLS
 // -------------------------------------------------------------
 function triggerBackup() {
-  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(loadFiles()));
+  const data = {
+    files: loadFiles(),
+    logs: loadLogs(),
+    certCodes: JSON.parse(localStorage.getItem('lots_calc_cert_codes')) || []
+  };
+  const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(data));
   const dlAnchorElem = document.createElement('a');
   dlAnchorElem.setAttribute("href", dataStr);
   dlAnchorElem.setAttribute("download", `حاسبة_الحصص_احتياطي_${Date.now()}.json`);
   dlAnchorElem.click();
   showToast("💾 تم تحميل ملف النسخة الاحتياطية بنجاح!");
+}
+
+function restoreBackup(event) {
+  const file = event.target.files[0];
+  if(!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      // Validate structure (support old backups which were just arrays, or new which are objects)
+      if (Array.isArray(data)) {
+        saveFiles(data);
+      } else if (data.files) {
+        saveFiles(data.files);
+        if (data.logs) saveLogs(data.logs);
+        if (data.certCodes) localStorage.setItem('lots_calc_cert_codes', JSON.stringify(data.certCodes));
+      }
+      showToast("✅ تم استرجاع النسخة الاحتياطية بنجاح!");
+      setTimeout(() => window.location.reload(), 1500);
+    } catch(err) {
+      showAlertModal("🛑 عذراً، ملف النسخة الاحتياطية غير صالح أو تالف!");
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset
 }
 
 function adjustReceiptNumbering() {
@@ -5245,5 +5280,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24922867f562834',t:'MTc4NTYzMjMxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24937d95ae62827',t:'MTc4NTYzMzE4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
