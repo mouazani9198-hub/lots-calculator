@@ -4451,11 +4451,11 @@ function generateCentralAllocationCode() {
     return;
   }
 
-  // Parse Date to Day, Month, Year, Hour, Minute
-  const d = new Date(certDateVal);
-  const m = d.getMonth() + 1; // 1-12
-  const y = d.getFullYear() % 100; // last 2 digits
-  const day = d.getDate();
+  // Parse Date to Day, Month, Year
+  const dateParts = certDateVal.split('-');
+  const y = parseInt(dateParts[0]) % 100; // last 2 digits
+  const m = parseInt(dateParts[1]); // 1-12
+  const day = parseInt(dateParts[2]);
 
   const now = new Date();
   const hh = now.getHours();
@@ -4485,7 +4485,7 @@ function generateCentralAllocationCode() {
   const ptVal = ptType + (certTypeVal * 2);
   const ptHex = ptVal.toString(16); // 1 char (0, 1, 2, or 3)
 
-  const staticPart = `${clientHex}${weightHex}${certHex}${dateHex}${ptHex}`; // 20 chars!
+  const staticPart = `${clientHex}${weightHex}${certHex}${dateHex}${ptHex}`.toUpperCase(); // 20 chars!
 
   // Calculate cryptographic-inspired signature salt checksum (3 characters) using STATIC Algiers salt
   const saltPart = "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ"; // Static secret salt key for Algiers compatibility
@@ -4538,7 +4538,15 @@ function decodeCentralAllocationCode() {
   }
   const expectedChecksum = (sum % 4095).toString(16).toUpperCase().padStart(3, '0');
 
-  if (providedChecksum !== expectedChecksum) {
+  // To support backward compatibility with codes generated before the uppercase fix
+  let sumLower = 0;
+  const combinedLower = staticPart.toLowerCase() + saltPart;
+  for (let i = 0; i < combinedLower.length; i++) {
+    sumLower += combinedLower.charCodeAt(i) * (i + 13);
+  }
+  const expectedChecksumLower = (sumLower % 4095).toString(16).toUpperCase().padStart(3, '0');
+
+  if (providedChecksum !== expectedChecksum && providedChecksum !== expectedChecksumLower) {
     showAlertModal("🛑 عذراً، فشل فك تشفير الكود! رمز الحماية والتحقق غير صحيح، مما يشير إلى أن الكود ربما تم توليده خارج رخصة الإدارة المركزية أو تم التلاعب به يدوياً.");
     return;
   }
@@ -5200,5 +5208,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a248abfd0f364912',t:'MTc4NTYyNzQ1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
