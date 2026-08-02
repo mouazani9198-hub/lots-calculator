@@ -1213,7 +1213,10 @@ tr:hover {
 
       <!-- Shipment Search filter & Modify helper & PWA controls -->
       <div style="margin-bottom: 12px; display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between;">
-        <input type="text" id="shipmentSearchInput" placeholder="🔍 ابحث عن رقم الحصة لتعديل العدد الكلي..." oninput="searchShipments()" style="flex: 2; min-width: 200px;">
+        <div style="flex: 2; min-width: 200px;">
+          <input type="text" id="shipmentSearchInput" placeholder="🔍 ابحث عن رقم الحصة لفرزها وعرض رصيدها..." oninput="searchShipments()" style="width: 100%;">
+          <div id="lotSearchTotal" style="display:none; font-size:12.5px; color:var(--fb-green); font-weight:bold; margin-top:8px; background: rgba(49, 162, 76, 0.1); padding: 8px; border-radius: 6px; border: 1px solid var(--fb-green);"></div>
+        </div>
         <div style="display: flex; gap: 10px; align-items: center; flex: 1; min-width: 250px; justify-content: flex-end;">
           <label class="switch-control" style="display: inline-flex; align-items: center; gap: 4px; font-weight: bold; cursor: pointer; font-size: 12px; width: auto; margin: 0; color: var(--text-current);">
             <input type="checkbox" id="showOnlyActiveSession" onchange="renderShipmentEntriesTable()" checked style="width: auto; margin-left: 4px;">
@@ -2534,13 +2537,15 @@ async function runOCR(input) {
       ).then(({ data: { text } }) => {
         console.log('Tesseract OCR Deep Scan Text:', text);
         
-        // Find the longest sequence of digits (Lot numbers usually are the longest number string on the label)
-        const matches = text.match(/\d{4,15}/g); // Look for number sequences between 4 and 15 digits
+        // Find the longest sequence of alphanumeric characters that contains at least 4 digits
+        // This regex looks for combinations of uppercase letters and numbers, ensuring it captures trailing letters like 'A', 'B'
+        const matches = text.match(/[A-Z0-9-]*\d{4,15}[A-Z0-9-]*/g); 
         
         if(matches && matches.length > 0) {
-          // Sort matches by length descending, assume the longest number is the LOT number
+          // Sort matches by length descending, assume the longest alphanumeric string is the LOT number
           matches.sort((a, b) => b.length - a.length);
-          const detectedLot = matches[0];
+          // Clean any trailing or leading hyphens that might have been accidentally read
+          const detectedLot = matches[0].replace(/^-|-$/g, '');
           
           ocrDetectedLot = detectedLot;
           document.getElementById('quickLotNumber').value = detectedLot;
@@ -3349,13 +3354,6 @@ function addShipmentBatch() {
     return;
   }
 
-  // LOT INPUT VALIDATION: Warn if not in expected lots list (101, 102 alert)
-  const expected = file.expectedLots || [];
-  if(expected.length > 0 && !expected.includes(lot)) {
-    showAlertModal(`⚠️ رقم الحصة "${lot}" غير صحيح! الحصص المتوقعة المسجلة في هذا الملف هي فقط: (${expected.join(' - ')}).`);
-    return;
-  }
-
   // STRICT LOT MATCHING VALIDATION FOR DELIVERIES (منع تسليم رقم حصة آخر غير مستلم في هذا الملف)
   if(currentMode === 'delivery') {
     const receivedLots = (file.receiving.entries || []).map(e => e.lot);
@@ -3392,21 +3390,38 @@ function addShipmentBatch() {
     }
   }
 
-  // Torn bags individual inputs (if option 2 is checked)
-  let pf = 0, pm = 0;
-  if(currentTornBagsMethod === 'total') {
-    pf = parseFloat(document.getElementById('generalPF').value) || 0;
-    pm = parseFloat(document.getElementById('generalPM').value) || 0;
+  function continueValidationAndAdd() {
+    let pf = 0, pm = 0;
+    if(currentTornBagsMethod === 'total') {
+      pf = parseFloat(document.getElementById('generalPF').value) || 0;
+      pm = parseFloat(document.getElementById('generalPM').value) || 0;
+    }
+
+    if(numPallets > 1) {
+      askConfirmation(() => proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm), 
+        `⚠️ تأكيد لسلامة المخزون: هل أنت متأكد من تكرار تسجيل الحصة "${lot}" لعدد (${numPallets}) منّصات للشاحنة رقم "${truck}"؟`);
+      return;
+    }
+
+    proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm);
   }
 
-  // Safety confirmation for smart repetition (طلب تأكيد تكرار الشحنات لسلامة المخزون)
-  if(numPallets > 1) {
-    askConfirmation(() => proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm), 
-      `⚠️ تأكيد لسلامة المخزون: هل أنت متأكد من تكرار تسجيل الحصة "${lot}" لعدد (${numPallets}) منّصات للشاحنة رقم "${truck}"؟`);
-    return;
+  // LOT INPUT VALIDATION FOR RECEIVING: Alert and isolate new/unknown lots
+  if (currentMode === 'receiving') {
+    const expected = file.expectedLots || [];
+    const alreadyReceived = (file.receiving.entries || []).some(e => e.lot === lot);
+    
+    if (!alreadyReceived && expected.length > 0 && !expected.includes(lot)) {
+      askConfirmation(() => {
+        continueValidationAndAdd();
+      }, `🛑 تنبيه عزل ومعاينة: رقم الحصة "${lot}" غير مدرج في قائمة الحصص المتوقعة للعقد، ولم يتم تدوينه في هذا الملف من قبل!<br><br>يرجى <b>عزل هذه المنصة للمعاينة والتحقق</b> من أنها مطابقة للمورد.<br><br>هل تريد الاستمرار وتسجيلها كحصة إضافية/دخيلة في النظام الآن؟`);
+      return;
+    } else if (!alreadyReceived) {
+      showToast(`ℹ️ تنبيه: يتم الآن تدوين رقم الحصة "${lot}" لأول مرة في هذا الملف.`);
+    }
   }
 
-  proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm);
+  continueValidationAndAdd();
 }
 
 function proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm) {
@@ -3558,10 +3573,29 @@ function renderShipmentEntriesTable() {
     entries = entries.filter(e => e.ts > lastCheckpointTs);
   }
 
-  // Filter based on search input
+  // Filter based on search input and calculate whole-file lot quantity dynamically
   const query = document.getElementById('shipmentSearchInput').value.trim();
+  const lotSearchTotalDiv = document.getElementById('lotSearchTotal');
   if(query) {
     entries = entries.filter(e => e.lot.includes(query) || (e.truck && e.truck.includes(query)));
+    
+    // Calculate precise stock inside this file for the searched lot
+    if (lotSearchTotalDiv && file) {
+      let lotRec = 0, lotDel = 0;
+      (file.receiving.entries || []).forEach(e => {
+        if (e.lot && e.lot.includes(query)) lotRec += entryWeight(e, file);
+      });
+      (file.deliveries || []).forEach(d => {
+        (d.entries || []).forEach(e => {
+          if (e.lot && e.lot.includes(query)) lotDel += entryWeight(e, file);
+        });
+      });
+      const lotTotal = Math.max(0, lotRec - lotDel);
+      lotSearchTotalDiv.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> إجمالي رصيد الحصة "${query}" في هذا الملف هو: <b>${lotTotal.toFixed(3)} طن</b>`;
+      lotSearchTotalDiv.style.display = 'block';
+    }
+  } else if (lotSearchTotalDiv) {
+    lotSearchTotalDiv.style.display = 'none';
   }
 
   if(entries.length === 0) {
@@ -3862,6 +3896,26 @@ function renderFilesList() {
   }
 
   list.forEach(f => {
+    // Calculate dynamic lot quantities inside this file
+    const pw = palletWeight(f);
+    let lotMap = {};
+    (f.receiving.entries || []).forEach(e => {
+      if(!e.lot) return;
+      if(!lotMap[e.lot]) lotMap[e.lot] = 0;
+      lotMap[e.lot] += entryWeight(e, f);
+    });
+    (f.deliveries || []).forEach(d => {
+      (d.entries || []).forEach(e => {
+        if(!e.lot) return;
+        if(lotMap[e.lot] !== undefined) lotMap[e.lot] -= entryWeight(e, f);
+      });
+    });
+    let lotsHtml = Object.keys(lotMap)
+      .filter(l => lotMap[l] > 0.001)
+      .map(l => `<span style="display:inline-block; background:rgba(49, 162, 76, 0.1); color:var(--fb-green); padding:3px 6px; border-radius:4px; margin:2px; font-size:11.5px; border: 1px solid var(--fb-green);"><b>${l}</b>: ${lotMap[l].toFixed(3)} طن</span>`)
+      .join(' ');
+    if(!lotsHtml) lotsHtml = '<span style="opacity:0.6; font-size:11px;">لا يوجد رصيد حصص</span>';
+
     const card = document.createElement('div');
     card.className = `file-mini-card ${f.id === currentFileId ? 'active' : ''}`;
     card.onclick = () => { selectActiveFile(f.id); };
@@ -3871,11 +3925,14 @@ function renderFilesList() {
         <span style="font-weight:bold; font-size:15px; color:var(--fb-blue);"><i class="fa-solid fa-file-invoice"></i> ملف: ${f.fileNumber}</span>
         <span class="chip" style="background-color:rgba(47, 143, 212, 0.1); color:var(--fb-blue);">${f.powderType} دسم</span>
       </div>
-      <div style="font-size:12px; opacity:0.8; line-height:1.6;">
+      <div style="font-size:12px; opacity:0.8; line-height:1.6; margin-bottom: 8px;">
         <div><b>المورد:</b> ${f.supplier}</div>
         <div><b>رقم العقد:</b> ${f.contractNumber} (${f.contractDate})</div>
         <div><b>الكمية المتعاقد عليها:</b> ${formatTons(f.contractedQty)} طن</div>
-        <div style="margin-top:4px; font-weight:bold; color:var(--fb-green);">الحصص المدرجة: ${f.expectedLots.join(', ') || '—'}</div>
+      </div>
+      <div style="border-top: 1px dashed var(--border-current); padding-top: 8px;">
+        <div style="font-size:11px; font-weight:bold; margin-bottom: 4px; color:var(--text-current);">تفصيل الحصص الحقيقية المتوفرة وكميتها:</div>
+        <div>${lotsHtml}</div>
       </div>
     `;
     container.appendChild(card);
@@ -5881,5 +5938,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24d652dcd3e6cb8',t:'MTc4NTY3Njk4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
