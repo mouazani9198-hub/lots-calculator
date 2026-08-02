@@ -3056,22 +3056,22 @@ function renderCounters() {
   const remainingWeight = Math.max(0, targetTons - cumulativeNetWeight);
 
   // Set top counter values (Remaining)
-  document.getElementById('numRemaining').textContent = Math.round(remainingPallets);
+  document.getElementById('numRemaining').textContent = remainingPallets.toFixed(1);
   document.getElementById('tonsRemaining').textContent = formatTons(remainingWeight);
 
   // Set bottom counter values (Registered - ONLY CURRENT SESSION!)
-  document.getElementById('numFilled').textContent = Math.round(sessionTotalPallets);
+  document.getElementById('numFilled').textContent = sessionTotalPallets.toFixed(1);
   document.getElementById('tonsFilled').textContent = formatTons(sessionNetWeight);
 
   // Update floating bar values
-  document.getElementById('floatNumRemaining').textContent = Math.round(remainingPallets);
+  document.getElementById('floatNumRemaining').textContent = remainingPallets.toFixed(1);
   document.getElementById('floatTonsRemaining').textContent = formatTons(remainingWeight);
-  document.getElementById('floatNumFilled').textContent = Math.round(sessionTotalPallets);
+  document.getElementById('floatNumFilled').textContent = sessionTotalPallets.toFixed(1);
   document.getElementById('floatTonsFilled').textContent = formatTons(sessionNetWeight);
 
   // Real-time mini updates on Accordion and Register headers so users don't have to scroll up
-  document.getElementById('liveAccordionTotals').textContent = `(دفعة الوصل الجاري: ${Math.round(sessionTotalPallets)} منّصة | ${formatTons(sessionNetWeight)} طن)`;
-  document.getElementById('liveShipmentRegisterTotals').textContent = `(دفعة الوصل الجاري: ${Math.round(sessionTotalPallets)} منّصة)`;
+  document.getElementById('liveAccordionTotals').textContent = `(دفعة الوصل الجاري: ${sessionTotalPallets.toFixed(1)} منّصة | ${formatTons(sessionNetWeight)} طن)`;
+  document.getElementById('liveShipmentRegisterTotals').textContent = `(دفعة الوصل الجاري: ${sessionTotalPallets.toFixed(1)} منّصة)`;
 }
 
 function onLotNumberTyped() {
@@ -5382,5 +5382,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24b34f238b62826',t:'MTc4NTY1NDAzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24b6b6939ac282d',t:'MTc4NTY1NjI3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
