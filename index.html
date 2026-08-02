@@ -4339,7 +4339,8 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
       const remainingBalance = Math.max(0, activeDelivery.targetTons - prevDeliveredWeight - finalNetWeight);
       
       deliveryDetailsHTML = `
-        <div class="pi-customer-box">
+        <div class="pi-customer-box" style="margin-top: 10px;">
+          <div style="margin-bottom: 5px; font-size: 14px; color: #2F8FD4;"><b>معلومات زبون التخصيص (Client et Affectation)</b></div>
           <div><b>اسم العميل الكامل:</b> ${activeDelivery.customerName}</div>
           <div><b>عنوان العميل:</b> ${activeDelivery.customerAddress || 'غير محدد'}</div>
           <div><b>رقم شهادة التخصيص:</b> <span dir="ltr" style="direction: ltr; display: inline-block;">${activeDelivery.certNumber}</span> | <b>تاريخ الشهادة:</b> ${activeDelivery.certDate || '—'}</div>
@@ -4369,14 +4370,20 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
       رقم الوصل المتسلسل للدفعة الحالية: ${numberSeq}
     </div>
 
-    <div class="pi-info-grid">
-      <div>رقم ملف الشحنة الأصلي: <b>${file.fileNumber}</b></div>
-      <div>نوع البودرة: <b>${file.powderType} دسم</b></div>
-      <div>رقم العقد: <b>${file.contractNumber}</b></div>
-      <div>تاريخ العقد: <b>${file.contractDate}</b></div>
-      <div>اسم المورد: <b>${file.supplier}</b></div>
-      <div>تاريخ الدفعة والطباعة: <b>${new Date().toLocaleString('ar-DZ')}</b></div>
+    <div class="pi-info-grid" style="grid-template-columns: 1fr; margin-bottom: 20px;">
+      <div style="background-color: #f8f9fa; padding: 10px; border: 1px solid #ddd; border-radius: 4px;">
+        <div style="margin-bottom: 5px; font-size: 14px; color: #2F8FD4;"><b>معلومات الشحنة والباخرة (Information du Navire)</b></div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>رقم الملف / BL: <b>${file.fileNumber}</b></div>
+          <div>تاريخ وصول الباخرة: <b>${file.arrivalDate || '—'}</b></div>
+          <div>اسم الباخرة: <b>${file.vessel || '—'}</b></div>
+          <div>نوع البودرة: <b>${file.powderType} دسم</b></div>
+          <div>اسم المورد: <b>${file.supplier}</b></div>
+          <div>رقم العقد: <b>${file.contractNumber}</b> (${file.contractDate})</div>
+        </div>
+      </div>
       ${deliveryDetailsHTML}
+      <div style="margin-top: 5px; font-weight: bold;">تاريخ ووقت الطباعة: <b>${new Date().toLocaleString('ar-DZ')}</b></div>
     </div>
 
     <table class="pi-table">
@@ -5720,22 +5727,34 @@ function exportAllToExcelActual() {
         });
       });
       
-      // Format lots text (e.g., "Lot123: 5.000 طن | Lot456: 12.000 طن")
-      let lotsDetails = Object.keys(lotMap)
-        .filter(lot => lotMap[lot] > 0.001)
-        .map(lot => `${lot}: ${lotMap[lot].toFixed(3)} طن`)
-        .join('  |  ');
+      // Split lots text into keys and quantities separately to align with specific column requests
+      let lotsNames = [];
+      let lotsQuantities = [];
+      
+      Object.keys(lotMap).forEach(lot => {
+        if(lotMap[lot] > 0.001) {
+          lotsNames.push(lot);
+          lotsQuantities.push(`${lotMap[lot].toFixed(3)} طن`);
+        }
+      });
+      
+      let lotsNamesStr = lotsNames.join(' \n');
+      let lotsQuantitiesStr = lotsQuantities.join(' \n');
         
-      if (!lotsDetails) lotsDetails = "لا يوجد أرقام حصص متبقية";
+      if (lotsNames.length === 0) {
+        lotsNamesStr = "لا توجد حصص متبقية";
+        lotsQuantitiesStr = "0.000 طن";
+      }
 
       return {
         "رقم الملف / BL": f.fileNumber,
         "نوع البودرة": f.powderType,
-        "تفصيل أرقام الحصص (Lots) المتوفرة في المخزن": lotsDetails,
+        "أرقام الحصص (Lots) المتوفرة في المخزن": lotsNamesStr,
+        "الرصيد الفعلي للحصة (طن)": lotsQuantitiesStr,
         "الكمية المتعاقد عليها (طن)": f.contractedQty,
         "المستلم الفعلي (طن)": recTons,
         "المسلم الكلي (طن)": delTons,
-        "الرصيد المتاح حالياً (طن)": remainingTons,
+        "إجمالي الرصيد المتاح (طن)": remainingTons,
         "المستودع": f.warehouse || "سعيدة 1",
         "المورد": f.supplier,
         "رقم العقد": f.contractNumber,
@@ -5928,5 +5947,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24db72a8e1de189',t:'MTc4NTY4MDM0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24efef71a7ce177',t:'MTc4NTY5Mzc3MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
