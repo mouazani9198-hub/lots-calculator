@@ -1219,8 +1219,11 @@ tr:hover {
             <input type="checkbox" id="showOnlyActiveSession" onchange="renderShipmentEntriesTable()" checked style="width: auto; margin-left: 4px;">
             <span>عرض الدفعة الجارية فقط 📋</span>
           </label>
+          <button class="btn btn-secondary" onclick="openReceiptsHistoryModal()" style="padding: 6px 12px; font-size: 11px; font-weight: bold; width: auto; min-height: unset; margin: 0; background-color: var(--fb-green); color: white; border-color: var(--fb-green);">
+            <i class="fa-solid fa-print"></i> سجل الوصولات
+          </button>
           <button class="btn btn-secondary" onclick="archiveCurrentBatch()" style="padding: 6px 12px; font-size: 11px; font-weight: bold; width: auto; min-height: unset; margin: 0; background-color: var(--fb-blue); color: white; border-color: var(--fb-blue);">
-            <i class="fa-solid fa-folder-minus"></i> أرشفة وتصفية الجدول الحالي 🧹
+            <i class="fa-solid fa-folder-minus"></i> أرشفة وتصفية
           </button>
         </div>
       </div>
@@ -1847,6 +1850,34 @@ tr:hover {
 <div id="floatingBottomBar" class="fb-floating-bar" style="display: none;">
   <span>🟢 المسجل: <span id="floatNumFilled" class="text-green">0</span> منّصة (<span id="floatTonsFilled" class="text-green">0.000</span> طن)</span>
   <span>🔴 المتبقي: <span id="floatNumRemaining" class="text-amber">0</span> منّصة (<span id="floatTonsRemaining" class="text-amber">0.000</span> طن)</span>
+</div>
+
+<!-- --- RECEIPTS HISTORY MODAL --- -->
+<div id="receiptsHistoryModal" class="modal-overlay">
+  <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-header">
+      <h2><i class="fa-solid fa-file-invoice"></i> سجل الوصولات السابقة (لإعادة الطباعة)</h2>
+      <span class="modal-close" onclick="closeModal('receiptsHistoryModal')">&times;</span>
+    </div>
+    <div class="modal-body" style="max-height: 400px; overflow-y: auto;">
+      <div style="font-size: 11px; opacity: 0.8; margin-bottom: 10px; line-height: 1.5;">
+        يعرض هذا السجل كافة الدفعات التي تم إغلاقها (أرشفتها أو طباعتها) سابقاً للعملية النشطة حالياً. يمكنك إعادة تحميل أي وصل بصيغة PDF في أي وقت.
+      </div>
+      <table class="pi-table" style="width:100%; border-collapse:collapse; font-size:12px; text-align:center;">
+        <thead>
+          <tr style="background:rgba(0,0,0,0.05);">
+            <th>رقم الوصل</th>
+            <th>التاريخ والوقت</th>
+            <th>الوزن الصافي (طن)</th>
+            <th>إجراء</th>
+          </tr>
+        </thead>
+        <tbody id="receiptsHistoryBody">
+          <!-- Rendered dynamically -->
+        </tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- --- CONFIRM DIALOG MODAL --- -->
@@ -4370,9 +4401,118 @@ async function closeBatchAndPrint() {
     // Increment seq for the next operations automatically
     localStorage.setItem(seqKey, seqNum + 1);
 
-    await savePDFFromPiContent(filenamePrefix);
+    try {
+      await savePDFFromPiContent(filenamePrefix);
+    } catch (err) {
+      console.error("PDF generation failed:", err);
+      showToast("⚠️ تم حفظ وإغلاق الوصل بنجاح، لكن تعذر توليد ملف الـ PDF. يمكنك طباعته من سجل الوصولات لاحقاً.");
+    }
     renderAll();
   }, `🔒 إغلاق وقفل دفعة اليوم لملف "${file.fileNumber}" — سيتم قفلها وإصدار وصل برقم متسلسل مستقل للوزن الإجمالي الصافي للدفعة الحالية وهو (${formatTons(calculatedTotal)} طن). هل أنت متأكد؟`);
+}
+
+// --- REPRINT PREVIOUS RECEIPTS FEATURE ---
+function openReceiptsHistoryModal() {
+  const file = getFile(currentFileId);
+  if(!file) {
+    showToast("⚠️ لا يوجد ملف نشط لعرض وصولاته!");
+    return;
+  }
+  
+  let checkpoints = [];
+  if(currentMode === 'receiving') {
+    checkpoints = file.receivingCheckpoints || [];
+  } else {
+    const d = file.deliveries.find(x => x.id === currentDeliveryId);
+    if (d) checkpoints = d.checkpoints || [];
+  }
+
+  const tbody = document.getElementById('receiptsHistoryBody');
+  tbody.innerHTML = '';
+  
+  if(checkpoints.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" style="padding:15px; opacity:0.6;">لا توجد وصولات مغلقة/مؤرشفة في هذا السجل</td></tr>';
+  } else {
+    // Show latest first
+    [...checkpoints].reverse().forEach((cp, reversedIdx) => {
+      // Find actual index to pass to reprint function
+      const idx = checkpoints.length - 1 - reversedIdx;
+      const timeStr = new Date(cp.ts).toLocaleString('ar-DZ');
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td><b style="color:var(--fb-blue);">${cp.seq || '—'}</b></td>
+        <td style="direction:ltr;">${timeStr}</td>
+        <td><b>${formatTons(cp.tons || 0)}</b></td>
+        <td>
+          <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px; margin:0;" onclick="reprintCheckpoint(${idx})">
+            <i class="fa-solid fa-file-pdf"></i> تحميل
+          </button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+  document.getElementById('receiptsHistoryModal').style.display = 'flex';
+}
+
+async function reprintCheckpoint(cpIndex) {
+  const file = getFile(currentFileId);
+  if(!file) return;
+
+  let checkpoints = [];
+  let allEntries = [];
+  let title = "";
+  let prefixName = "";
+  
+  if(currentMode === 'receiving') {
+    checkpoints = file.receivingCheckpoints || [];
+    allEntries = file.receiving.entries || [];
+    title = "وصل استلام (أرشيف) — Bon de Réception (Reprint)";
+    prefixName = "Reprint_Reception";
+  } else {
+    const d = file.deliveries.find(x => x.id === currentDeliveryId);
+    if (d) {
+      checkpoints = d.checkpoints || [];
+      allEntries = d.entries || [];
+      title = "سند خروج (أرشيف) — Bon de Sortie (Reprint)";
+    }
+    prefixName = "Reprint_Livraison";
+  }
+
+  const currCp = checkpoints[cpIndex];
+  const prevCp = cpIndex > 0 ? checkpoints[cpIndex - 1] : null;
+  
+  const startTs = prevCp ? prevCp.ts : 0;
+  const endTs = currCp.ts;
+
+  // Filter entries belonging to this specific closed checkpoint
+  const cpEntries = allEntries.filter(e => e.ts > startTs && e.ts <= endTs);
+
+  if (cpEntries.length === 0) {
+    showToast("⚠️ لا توجد شحنات مسجلة داخل هذا الوصل!");
+    return;
+  }
+
+  showToast("⏳ جاري توليد ملف الـ PDF للوصل السابق...");
+  try { 
+    await loadPDFLibraries(); 
+  } catch(e) { 
+    showToast("⚠️ تعذر تحميل المكتبات - تأكد من اتصالك بالإنترنت"); 
+    return; 
+  }
+
+  const formattedSeq = currCp.seq || "000";
+  document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false);
+
+  const filenamePrefix = `${prefixName}_${file.fileNumber}_Seq${formattedSeq}`;
+  
+  try {
+    await savePDFFromPiContent(filenamePrefix);
+    showToast("✅ تم حفظ الوصل بنجاح!");
+  } catch (err) {
+    console.error(err);
+    showToast("⚠️ حدث خطأ أثناء الحفظ.");
+  }
 }
 
 function printCurrentStatus() {
@@ -5438,5 +5578,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c08b8dfb32833',t:'MTc4NTY2MjcxMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24c36cfad53282d',t:'MTc4NTY2NDYwMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
