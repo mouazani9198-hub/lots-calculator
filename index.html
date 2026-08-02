@@ -1639,9 +1639,10 @@ tr:hover {
         </div>
         <div class="field">
           <label style="color: var(--text-current);">اسم الزبون (الملبنة)</label>
-          <select id="gcCustomerSelect">
+          <input type="text" id="gcCustomerInput" placeholder="اكتب اسم الملبنة (مثال: ملبنة جيلي)" list="gcCustomerDatalist">
+          <datalist id="gcCustomerDatalist">
             <!-- Populated from DAIRY_LIST -->
-          </select>
+          </datalist>
         </div>
         <div class="form-row">
           <div class="field">
@@ -2162,9 +2163,9 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('deductTornBagsChecked').checked = deductTornBagsChecked;
 
   // Populate Algiers simulation customer list
-  const gcSelect = document.getElementById('gcCustomerSelect');
-  if (gcSelect) {
-    gcSelect.innerHTML = DAIRY_LIST.map((d, idx) => `<option value="${idx}">${d}</option>`).join('');
+  const gcDatalist = document.getElementById('gcCustomerDatalist');
+  if (gcDatalist) {
+    gcDatalist.innerHTML = DAIRY_LIST.map(d => `<option value="${d}">`).join('');
   }
   const gcDateInput = document.getElementById('gcCertDate');
   if (gcDateInput) {
@@ -4530,7 +4531,12 @@ function installPWA() {
 
 // --- CENTRAL ALGIERS CODE ENCODER/DECODER ---
 function generateCentralAllocationCode() {
-  const customerIdx = parseInt(document.getElementById('gcCustomerSelect').value) || 0;
+  const customerInputName = document.getElementById('gcCustomerInput').value.trim() || "ملبنة زبون مركزي";
+  
+  // Try to find if it matches our standard list to get an index, otherwise use 99 (custom)
+  let customerIdx = DAIRY_LIST.indexOf(customerInputName);
+  if (customerIdx === -1) customerIdx = 99; // 99 means custom text
+  
   const certNo = document.getElementById('gcCertNo').value.trim() || '1514';
   const certDateVal = document.getElementById('gcCertDate').value || '2026-08-01';
   const powderType = document.getElementById('gcPowderType').value;
@@ -4593,11 +4599,10 @@ function generateCentralAllocationCode() {
   
   // Save to Algiers history log
   const logList = JSON.parse(localStorage.getItem('lots_calc_cert_codes')) || [];
-  const customerName = DAIRY_LIST[customerIdx] || "ملبنة زبون مركزي";
   const certNumber = `${certDigits}/${certTypeChar}`;
   logList.push({
     ts: Date.now(),
-    customerName,
+    customerName: customerInputName, // Save the actual typed text
     certNumber,
     targetTons,
     code: generatedCode
@@ -4660,7 +4665,7 @@ function decodeCentralAllocationCode() {
   const certType = Math.floor(ptVal / 2); // 0 for E, 1 for P
 
   // Resolve data
-  const customerName = DAIRY_LIST[clientIdx] || "ملبنة زبون مركزي";
+  const customerName = (clientIdx === 99) ? "ملبنة زبون مركزي (إضافية)" : (DAIRY_LIST[clientIdx] || "ملبنة زبون مركزي");
   const certTypeChar = (certType === 0) ? "E" : "P";
   const certNumber = `${certDigits}/${certTypeChar}`;
   const certDate = `20${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
@@ -5377,5 +5382,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2496adfce90ba94',t:'MTc4NTYzNTI3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24b34f238b62826',t:'MTc4NTY1NDAzOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
