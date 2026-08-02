@@ -1676,6 +1676,25 @@ tr:hover {
             <i class="fa-solid fa-copy"></i> نسخ الرمز لرسالة SMS/WhatsApp
           </button>
         </div>
+
+        <!-- Section: Generate Digital Key File -->
+        <div class="card" style="margin-top: 25px; border: 1px dashed var(--fb-amber); background-color: rgba(234, 168, 0, 0.03); box-shadow: none;">
+          <h3 style="font-size: 14px; color: var(--fb-amber); margin-bottom: 10px;"><i class="fa-solid fa-file-shield"></i> إصدار مفتاح رقمي أمني جديد (Digital Key File)</h3>
+          <div style="font-size: 11px; opacity: 0.8; margin-bottom: 10px;">قم بتوليد مفتاح أمني رقمي جديد (.onil) وأرسله لمدراء المخازن لتحديث نظام التشفير لديهم بشكل آلي.</div>
+          <div class="form-row">
+            <div class="field">
+              <label>اسم المستخدم (المنشئ)</label>
+              <input type="text" id="dkUsername" placeholder="مثال: admin_alger">
+            </div>
+            <div class="field">
+              <label>كلمة مرور الإصدار</label>
+              <input type="password" id="dkPassword" placeholder="اكتب كلمة مرور...">
+            </div>
+          </div>
+          <button class="btn btn-primary" style="width: 100%; background-color: var(--text-current); color: var(--bg-current); border: none;" onclick="generateDigitalKeyFile()">
+            <i class="fa-solid fa-download"></i> توليد وتنزيل ملف المفتاح (.onil)
+          </button>
+        </div>
       </div>
     </div>
 
@@ -1780,30 +1799,29 @@ tr:hover {
       </div>
     </div>
 
-    <!-- Card: Advanced Cryptographic Settings -->
+    <!-- Card: Advanced Cryptographic Settings (Digital Key File) -->
     <div class="card" style="border: 1px solid var(--border-current); background-color: var(--card-current); margin-top: 15px;">
-      <h2><i class="fa-solid fa-shield-halved" style="color: var(--fb-blue);"></i> ⚙️ تدوير المفاتيح الأمنية المتقدمة (تعديل الرمز السري للتشفير)</h2>
+      <h2><i class="fa-solid fa-shield-halved" style="color: var(--fb-blue);"></i> ⚙️ تدوير المفاتيح الأمنية بالملف الرقمي (Digital Key File)</h2>
       <div id="cryptoSettingsBody" style="line-height: 1.6; font-size: 13px;">
         <div style="background-color: rgba(47, 143, 212, 0.05); padding: 10px; border-radius: 6px; margin-bottom: 12px; font-weight: bold; text-align: center; color: var(--fb-blue);">
-          🔒 تتيح هذه اللوحة للإدارة تدوير وتغيير المفاتيح الأمنية السرية المعتمدة لتشفير السندات وشهادات التخصيص لمنع أي محاولة تلاعب.
+          🔒 نظام أمني متقدم: يتم تدوير مفاتيح التشفير حصرياً عبر قراءة ملف مفتاح رقمي (.onil) صادر من الإدارة المركزية، لضمان أعلى درجات الموثوقية دون تدخل بشري.
         </div>
-        <div class="field">
-          <label style="color: var(--text-current); font-size:11px;">الرمز السري الحالي المفعّل (Old Secret Salt):</label>
-          <input type="password" id="cryptoOldSalt" readonly style="font-family: monospace; font-weight: bold; background-color: rgba(0,0,0,0.05); opacity: 0.8; padding: 6px 10px;">
-        </div>
-        <div class="field">
-          <label style="font-weight: bold; color: var(--text-current); font-size:11px;">الرمز السري الجديد المطلوب تفعيله (New Secret Salt):</label>
-          <input type="password" id="cryptoNewSalt" placeholder="اكتب الرمز السري الجديد هنا..." style="font-family: monospace; font-weight: bold; border-color: var(--fb-blue); padding: 6px 10px;">
-        </div>
-        <div style="display: flex; gap: 8px; margin-top: 12px;">
-          <button class="btn btn-primary" onclick="rotateSecretSalt()" style="flex: 2; padding: 6px 12px; font-size: 11px; font-weight: bold; width: auto; min-height: unset; margin: 0; background-color: var(--fb-blue); border-color: var(--fb-blue);">
-            <i class="fa-solid fa-key"></i> تدوير وتثبيت المفتاح الجديد 🔐
-          </button>
-          <button class="btn btn-secondary" onclick="resetSecretSaltToDefault()" style="flex: 1; padding: 6px 12px; font-size: 11px; font-weight: bold; width: auto; min-height: unset; margin: 0;">
-            <i class="fa-solid fa-arrow-rotate-left"></i> استرجاع الأصلي
+        
+        <div style="text-align: center; margin-bottom: 15px;">
+          <input type="file" id="onilKeyFileInput" accept=".onil" style="display:none;" onchange="applyDigitalKeyFile(event)">
+          <button class="btn btn-primary" onclick="document.getElementById('onilKeyFileInput').click()" style="width: 100%; background-color: var(--fb-blue); border-color: var(--fb-blue); padding: 12px; font-size: 14px; font-weight: bold;">
+            <i class="fa-solid fa-file-shield" style="font-size: 18px; margin-left: 5px;"></i> رفع وتفعيل ملف المفتاح الرقمي (.onil)
           </button>
         </div>
-        <div style="font-size: 11px; opacity: 0.7; margin-top: 8px; text-align: center; color: var(--text-current);">
+
+        <div style="text-align: center;">
+          <button class="btn btn-secondary" onclick="initiateRevertToDefault()" style="width: 100%; padding: 10px; font-size: 12px; font-weight: bold; border: 1px dashed var(--text-sec-current);">
+            <i class="fa-solid fa-arrow-rotate-left"></i> الرجوع للرمز السري الأصلي للنظام
+          </button>
+        </div>
+        <input type="file" id="revertKeyFileInput" accept=".onil" style="display:none;" onchange="finalizeRevertToDefault(event)">
+
+        <div style="font-size: 11px; opacity: 0.7; margin-top: 10px; text-align: center; color: var(--text-current);">
           💡 بموجب الحماية السيبرانية؛ في حال قمت بمسح كاش المتصفح أو إعادة تنصيب التطبيق، سيعود النظام تلقائياً للعمل بالمفتاح الأصلي المصنع للديوان.
         </div>
       </div>
@@ -4559,8 +4577,8 @@ function generateCentralAllocationCode() {
 
   const staticPart = `${clientHex}${weightHex}${certHex}${dateHex}${ptHex}`.toUpperCase(); // 20 chars!
 
-  // Calculate cryptographic-inspired signature salt checksum (3 characters) using STATIC Algiers salt
-  const saltPart = "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ"; // Static secret salt key for Algiers compatibility
+  // Calculate cryptographic-inspired signature salt checksum (3 characters) using Dynamic salt
+  const saltPart = localStorage.getItem('onil_custom_salt') || "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ"; // Uses active digital key
   const combined = staticPart + saltPart;
   let sum = 0;
   for (let i = 0; i < combined.length; i++) {
@@ -4601,8 +4619,8 @@ function decodeCentralAllocationCode() {
   const staticPart = code.substring(7, 27); // 20 chars
   const providedChecksum = code.substring(27, 30); // 3 chars
 
-  // Validate cryptographic checksum with Algiers static secret salt
-  const saltPart = "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ"; // Static secret salt key for Algiers compatibility
+  // Validate cryptographic checksum with Active Digital Key
+  const saltPart = localStorage.getItem('onil_custom_salt') || "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ"; // Dynamic secret salt key
   const combined = staticPart + saltPart;
   let sum = 0;
   for (let i = 0; i < combined.length; i++) {
@@ -4915,56 +4933,135 @@ function renderAIPredictor() {
 }
 
 // --- KEY ROTATION & SECURITY SALT ---
-function rotateSecretSalt() {
-  const oldSalt = localStorage.getItem('onil_custom_salt') || "ONIL_SECRET_2026_WEST";
-  const newSalt = document.getElementById('cryptoNewSalt').value.trim();
-
-  if (!newSalt) {
-    showToast("⚠️ الرجاء كتابة الرمز السري الجديد أولاً لتعديله!");
+// --- DIGITAL KEY FILE FUNCTIONS ---
+function generateDigitalKeyFile() {
+  const user = document.getElementById('dkUsername').value.trim();
+  const pass = document.getElementById('dkPassword').value.trim();
+  
+  if (!user || !pass) {
+    showAlertModal("⚠️ يرجى إدخال اسم المستخدم وكلمة المرور لإصدار المفتاح الرقمي!");
     return;
   }
-
-  if (newSalt === oldSalt) {
-    showToast("⚠️ الرمز الجديد مطابق تماماً للرمز الحالي!");
-    return;
+  
+  const ts = Date.now();
+  // Generate a complex salt combining user, pass, and time
+  const rawString = user + "_" + pass + "_" + ts;
+  
+  // Simple fast hash function for the browser
+  let hash = 0;
+  for (let i = 0; i < rawString.length; i++) {
+    hash = ((hash << 5) - hash) + rawString.charCodeAt(i);
+    hash |= 0;
   }
-
-  askConfirmation(() => {
-    localStorage.setItem('onil_custom_salt', newSalt);
-    document.getElementById('cryptoOldSalt').value = newSalt;
-    document.getElementById('cryptoNewSalt').value = '';
-    
-    // Clear Algiers generated codes history log because they were signed with the old salt!
-    localStorage.removeItem('lots_calc_cert_codes');
-    renderCryptographicCodesLog();
-
-    showAlertModal(`✅ <b>تم تدوير وتحديث المفتاح السري للتشفير بنجاح!</b><br><br>` +
-      `🔑 <b>المفتاح القديم:</b> <span dir="ltr">${oldSalt}</span><br>` +
-      `🔐 <b>المفتاح الجديد المصادق عليه:</b> <span dir="ltr">${newSalt}</span><br><br>` +
-      `⚠️ <b>تنبيه أمني هام:</b> تم مسح سجل الأكواد التوليدية القديمة تلقائياً لتفادي خلط التوقيعات الرقمية بين الأكواد القديمة والجديدة.`, "تدوير الرمز بنجاح 🔐", false);
-    
-    renderAll();
-  }, `🔐 هل أنت متأكد من تدوير وتغيير المفتاح السري للتشفير؟ سيقوم هذا بإبطال كافة كودات شهادات التخصيص السابقة التي توليدها بالمفتاح القديم كحماية مطلقة.`);
+  
+  const salt = "ONIL_" + Math.abs(hash).toString(16).toUpperCase() + "_" + ts.toString().slice(-4);
+  
+  const keyData = {
+    type: "ONIL_DIGITAL_KEY",
+    username: user,
+    timestamp: ts,
+    salt: salt
+  };
+  
+  const encodedKey = btoa(unescape(encodeURIComponent(JSON.stringify(keyData))));
+  
+  // Download file
+  const dataStr = "data:text/plain;charset=utf-8," + encodedKey;
+  const dl = document.createElement('a');
+  dl.setAttribute("href", dataStr);
+  dl.setAttribute("download", `KEY_${user}_${ts.toString().slice(-4)}.onil`);
+  dl.click();
+  
+  // Also apply it to the central generator immediately
+  localStorage.setItem('onil_custom_salt', salt);
+  
+  // Clear inputs
+  document.getElementById('dkUsername').value = '';
+  document.getElementById('dkPassword').value = '';
+  
+  showAlertModal(`✅ <b>تم توليد وتنزيل ملف المفتاح الرقمي بنجاح!</b><br><br>تم تفعيل هذا المفتاح تلقائياً في منشئ الإدارة المركزية.<br><br>🔑 <b>الكلمة السرية المحتواة في الملف (للمرجعية):</b><br><div style="user-select:all; font-family:monospace; font-size:16px; font-weight:bold; background:#eee; color:#000; padding:10px; text-align:center; display:block; margin-top:10px; border-radius:4px;">${salt}</div><br><br>يرجى إرسال ملف الـ <b>(.onil)</b> لمدراء المخازن لتحديث أنظمتهم برفع هذا الملف بدلاً من كتابة الكلمة السرية.`);
 }
 
-function resetSecretSaltToDefault() {
-  const currentSalt = localStorage.getItem('onil_custom_salt') || "ONIL_SECRET_2026_WEST";
-  if (currentSalt === "ONIL_SECRET_2026_WEST") {
-    showToast("✓ النظام يعمل بالفعل بالمفتاح الأصلي المصنع للديوان.");
+function applyDigitalKeyFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const decoded = decodeURIComponent(escape(atob(e.target.result)));
+      const data = JSON.parse(decoded);
+      
+      if (data.type === "ONIL_DIGITAL_KEY" && data.salt) {
+        localStorage.setItem('onil_custom_salt', data.salt);
+        
+        // Optional: clear codes log since old codes won't work with the new key
+        localStorage.removeItem('lots_calc_cert_codes');
+        renderCryptographicCodesLog();
+        
+        showAlertModal(`🔐 <b>تم تثبيت المفتاح الرقمي بنجاح!</b><br><br>تم تدوير نظام التشفير. الرمز السري الجديد المعتمد الذي تم استخراجه من الملف هو:<br><br><div style="user-select:all; font-family:monospace; font-size:16px; font-weight:bold; background:#eee; color:#000; padding:10px; text-align:center; display:block; border-radius:4px; direction:ltr;">${data.salt}</div>`);
+      } else {
+        throw new Error("Invalid format");
+      }
+    } catch(err) {
+      showAlertModal("🛑 عذراً، الملف المرفوع ليس ملف مفتاح صالح أو أنه تالف!");
+    }
+    event.target.value = ''; // reset
+  };
+  reader.readAsText(file);
+}
+
+let tempRevertAttemptSalt = "";
+
+function initiateRevertToDefault() {
+  const currentSalt = localStorage.getItem('onil_custom_salt') || "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ";
+  
+  if (currentSalt === "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ") {
+    showAlertModal("✓ النظام يعمل بالفعل بالمفتاح الأصلي المصنع للديوان. لا يوجد مفتاح رقمي للإلغاء.");
     return;
   }
+  
+  const input = prompt("لأسباب أمنية، يرجى كتابة الرمز السري الحالي (المودباس الذي أظهره لك النظام عند تفعيل ملف المفتاح الرقمي):");
+  
+  if (input === null || input.trim() === "") return;
+  
+  if (input.trim() === currentSalt) {
+    tempRevertAttemptSalt = input.trim();
+    alert("✅ الكلمة صحيحة! يرجى الآن رفع ملف المفتاح الرقمي (.onil) الحالي لتأكيد الإلغاء النهائي.");
+    document.getElementById('revertKeyFileInput').click();
+  } else {
+    showAlertModal("🛑 الرمز السري غير صحيح! لا يمكنك استرجاع المفتاح الأصلي بدون كتابة الرمز الحالي الصحيح.");
+  }
+}
 
-  askConfirmation(() => {
-    localStorage.removeItem('onil_custom_salt');
-    document.getElementById('cryptoOldSalt').value = "ONIL_SECRET_2026_WEST";
-    document.getElementById('cryptoNewSalt').value = '';
-    
-    localStorage.removeItem('lots_calc_cert_codes');
-    renderCryptographicCodesLog();
-
-    showToast("✓ تم استعادة المفتاح الأصلي المصنع للديوان بنجاح وتصفية السجل!");
-    renderAll();
-  }, "↩️ هل أنت متأكد من استعادة المفتاح الأصلي المصنع للديوان وتصفية سجل الأكواد؟");
+function finalizeRevertToDefault(event) {
+  const file = event.target.files[0];
+  if (!file) {
+    tempRevertAttemptSalt = "";
+    return;
+  }
+  
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const decoded = decodeURIComponent(escape(atob(e.target.result)));
+      const data = JSON.parse(decoded);
+      
+      if (data.type === "ONIL_DIGITAL_KEY" && data.salt === tempRevertAttemptSalt) {
+        localStorage.setItem('onil_custom_salt', "ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ");
+        localStorage.removeItem('lots_calc_cert_codes');
+        renderCryptographicCodesLog();
+        showAlertModal("✅ تم التحقق من الملف بنجاح! تم إلغاء المفتاح الرقمي واسترجاع الرمز السري الأصلي للنظام (ONIL_CENTRAL_SECRET_ALGIERS_2026_DZ).");
+      } else {
+        showAlertModal("🛑 ملف المفتاح المرفوع لا يتطابق مع الرمز الحالي!");
+      }
+    } catch(err) {
+      showAlertModal("🛑 عذراً، الملف المرفوع غير صالح!");
+    }
+    event.target.value = ''; // reset
+    tempRevertAttemptSalt = "";
+  };
+  reader.readAsText(file);
 }
 
 // --- ACTIVE FILE EDIT MODAL FUNCTIONS ---
@@ -5280,5 +5377,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24937d95ae62827',t:'MTc4NTYzMzE4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2496adfce90ba94',t:'MTc4NTYzNTI3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
