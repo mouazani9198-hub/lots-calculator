@@ -1167,14 +1167,12 @@ tr:hover {
       </div>
 
        <!-- Added Photo Capture and Voice capture field (التعرف الضوئي التلقائي OCR والإدخال الصوتي للحصة) -->
+       <!-- Removed Barcode Button as requested -->
        <div class="field">
-         <label>الإدخال الذكي للحصة (مسح الباركود السريع أو الإملاء الصوتي)</label>
+         <label>الإدخال الذكي والسريع للحصة (عبر المايكروفون)</label>
          <div style="display:flex; gap:10px; align-items:center;">
-           <button type="button" class="btn btn-secondary" onclick="startBarcodeScanner()" style="flex:1;">
-             <i class="fa-solid fa-barcode"></i> مسح باركود (QR)
-           </button>
-           <button type="button" class="btn btn-primary" onclick="startVoiceLotInput()" style="flex:1; background-color:var(--fb-blue); border-color:var(--fb-blue);">
-             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت
+           <button type="button" class="btn btn-primary" onclick="startVoiceLotInput()" style="width:100%; background-color:var(--fb-blue); border-color:var(--fb-blue); padding: 12px; font-size: 14px;">
+             <i class="fa-solid fa-microphone"></i> إملاء الحصة بالصوت (Voice)
            </button>
          </div>
        </div>
@@ -2085,11 +2083,11 @@ tr:hover {
   <div class="modal-box" style="border: 2px solid var(--fb-blue); box-shadow: 0 4px 20px rgba(47, 143, 212, 0.2);">
     <div class="modal-header">
       <i class="fa-solid fa-expand" style="color: var(--fb-blue); font-size: 22px;"></i>
-      <span>التعرف الضوئي الذكي (OCR)</span>
+      <span>التعرف الصوتي الذكي</span>
     </div>
     <div class="modal-body">
       <p style="font-size: 15px; font-weight: bold; margin-bottom: 12px; color: var(--text-current);">
-        🔢 تم التعرف على رقم الحصة التالي من الكاميرا: <span id="ocrDetectedLotSpan" style="color:var(--fb-blue); font-size: 22px; font-weight: 900;">—</span>
+        🎙️ تم التعرف على رقم الحصة التالي من الصوت: <br><br> <span id="ocrDetectedLotSpan" style="color:var(--fb-blue); font-size: 26px; font-weight: 900;">—</span>
       </p>
       <div class="field">
         <label>أدخل عدد المنصات التي تحوي هذا الرقم</label>
@@ -2467,149 +2465,11 @@ function speakLotNumber(lot) {
 
 
 
-// --- ULTRA FAST BARCODE / QR SCANNER FEATURE (Using jsQR & Zxing fallbacks to emulate native behavior) ---
-// Replaced HTML5-QRCode with a universally compatible direct video stream approach to bypass device restrictions
-let scanningVideo = null;
-let scanningStream = null;
-let scannerInterval = null;
+// Removed Barcode/QR functionality as per user request to simplify app
+// Audio voice features and manual data entry remain intact
 
-function loadBarcodeLibraries() {
-  return new Promise((resolve, reject) => {
-    if(window.jsQR && window.ZXing) { resolve(); return; }
-    
-    let loaded = 0;
-    const checkDone = () => { loaded++; if(loaded === 2) resolve(); };
-
-    // Primary QR engine (blazing fast)
-    const s1 = document.createElement('script');
-    s1.src = 'https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js';
-    s1.onload = checkDone;
-    s1.onerror = () => reject(new Error('Failed to load jsQR'));
-    document.head.appendChild(s1);
-
-    // Secondary Barcode engine for 1D barcodes (Lot numbers)
-    const s2 = document.createElement('script');
-    s2.src = 'https://unpkg.com/@zxing/library@latest';
-    s2.onload = checkDone;
-    s2.onerror = () => reject(new Error('Failed to load ZXing'));
-    document.head.appendChild(s2);
-  });
-}
-
-function stopCurrentScanner() {
-  if (scannerInterval) clearInterval(scannerInterval);
-  if (scanningStream) {
-    scanningStream.getTracks().forEach(track => track.stop());
-    scanningStream = null;
-  }
-  if (scanningVideo) {
-    scanningVideo.pause();
-    scanningVideo.srcObject = null;
-    scanningVideo = null;
-  }
-}
-
-async function startBarcodeScannerBase(onSuccessCallback) {
-  showToast("⏳ جاري تهيئة الكاميرا...");
-  try { await loadBarcodeLibraries(); } catch(e) { showToast("⚠️ تعذر تحميل المكتبة"); return; }
-  
-  stopCurrentScanner();
-  const modal = document.getElementById('barcodeModal');
-  modal.style.display = 'flex';
-  
-  const container = document.getElementById('barcode-reader');
-  container.innerHTML = '<video id="qr-video" style="width: 100%; max-height: 300px; object-fit: cover;" playsinline></video><canvas id="qr-canvas" style="display:none;"></canvas>';
-  
-  scanningVideo = document.getElementById('qr-video');
-  const canvasElement = document.getElementById('qr-canvas');
-  const canvas = canvasElement.getContext("2d", { willReadFrequently: true });
-
-  const constraints = {
-    video: { facingMode: { exact: "environment" } }
-  };
-
-  try {
-    scanningStream = await navigator.mediaDevices.getUserMedia(constraints);
-  } catch(err) {
-    console.warn("Exact environment camera failed, falling back to any video device", err);
-    try {
-      scanningStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-    } catch(fallbackErr) {
-      console.error("All camera requests failed", fallbackErr);
-      modal.style.display = 'none';
-      showAlertModal("⚠️ يرجى التأكد من منح صلاحيات الكاميرا للمتصفح.");
-      return;
-    }
-  }
-
-  scanningVideo.srcObject = scanningStream;
-  scanningVideo.setAttribute("playsinline", true);
-  scanningVideo.play();
-
-  let zxingReader = null;
-  if(window.ZXing) {
-    zxingReader = new ZXing.BrowserMultiFormatReader();
-  }
-
-  const tick = () => {
-    if (scanningVideo && scanningVideo.readyState === scanningVideo.HAVE_ENOUGH_DATA) {
-      canvasElement.height = scanningVideo.videoHeight;
-      canvasElement.width = scanningVideo.videoWidth;
-      canvas.drawImage(scanningVideo, 0, 0, canvasElement.width, canvasElement.height);
-      
-      const imageData = canvas.getImageData(0, 0, canvasElement.width, canvasElement.height);
-      
-      // 1. Try QR Code first
-      const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "dontInvert" });
-      
-      if (code && code.data) {
-        onSuccessCallback(code.data);
-        return;
-      }
-
-      // 2. Try 1D Barcode (ZXing) if QR fails
-      if (zxingReader) {
-        try {
-          const result = zxingReader.decodeFromCanvas(canvasElement);
-          if (result && result.text) {
-            onSuccessCallback(result.text);
-            return;
-          }
-        } catch(e) {}
-      }
-    }
-    scannerInterval = requestAnimationFrame(tick);
-  };
-  
-  scannerInterval = requestAnimationFrame(tick);
-}
-
-async function startBarcodeScanner() {
-  startBarcodeScannerBase((decodedText) => {
-    stopCurrentScanner();
-    document.getElementById('barcodeModal').style.display = 'none';
-    speakLotNumber(decodedText);
-    
-    ocrDetectedLot = decodedText;
-    document.getElementById('quickLotNumber').value = decodedText;
-    openOcrModal(decodedText);
-    renderSuggestedChips();
-  });
-}
-          document.getElementById('barcodeModal').style.display = 'none';
-        }
-      });
-    } catch(err) {
-      console.error("Camera Init Error:", err);
-      document.getElementById('barcodeModal').style.display = 'none';
-    }
-  }, 300);
-}
-
-function closeBarcodeModal() {
-  document.getElementById('barcodeModal').style.display = 'none';
-  stopCurrentScanner();
-}
+function stopCurrentScanner() {} // Stub removed feature
+function closeBarcodeModal() {} // Stub removed feature
 
 // --- VOICE RECOGNITION FOR LOT INPUT USING WEB SPEECH API ---
 function startVoiceLotInput() {
@@ -4824,39 +4684,7 @@ function runSecurityAuditVerifier() {
   resultDiv.style.color = 'var(--fb-green)';
 }
 
-async function startAuditBarcodeScanner() {
-  startBarcodeScannerBase((decodedText) => {
-    stopCurrentScanner();
-    document.getElementById('barcodeModal').style.display = 'none';
-    
-    if (decodedText.startsWith("ONIL_VERIFY")) {
-      const parts = decodedText.split('|').map(p => p.trim());
-      try {
-        const fileNum = parts[1].replace('BL:', '').trim();
-        const seqNum = parts[2].replace('Seq:', '').trim();
-        const netTons = parseFloat(parts[3].replace('NetTons:', '').trim());
-        const hash = parts[4].replace('Hash:', '').trim();
-        
-        document.getElementById('auditFileNumber').value = fileNum;
-        document.getElementById('auditSeqNumber').value = seqNum;
-        document.getElementById('auditNetWeight').value = netTons;
-        
-        runSecurityAuditVerifier();
-        
-        const calculatedHash = document.getElementById('auditGeneratedHash').textContent;
-        if (calculatedHash === hash) {
-          showAlertModal(`✅ <b>الوصل أصلي وسليم 100%!</b><br><br>تم التحقق بنجاح من الشفرة. لا يوجد أي تلاعب في الأوزان.<br><br><b>الوزن الصافي المعتمد:</b> ${netTons.toFixed(3)} طن`);
-        } else {
-          showAlertModal(`🛑 <b>تنبيه أمني خطير! الوصل مزور!</b><br><br>البيانات المطبوعة على الوصل لا تتطابق مع الشفرة السرية الخاصة به. يرجى إيقاف الشاحنة فوراً!`);
-        }
-      } catch (e) {
-        showAlertModal("⚠️ يبدو أن رمز الـ QR تالف أو غير مقروء بشكل صحيح.");
-      }
-    } else {
-      showAlertModal("⚠️ هذا الرمز ليس رمز تحقق رسمي صادر من ديوان ONIL.");
-    }
-  });
-}
+
 
 // --- PWA NATIVE INSTALL CONTROL ---
 let deferredPrompt;
@@ -5807,5 +5635,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f23c33cbb2818',t:'MTc4NTY5NTI3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f36cd2897a6ea',t:'MTc4NTY5NjA1OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
