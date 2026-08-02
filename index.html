@@ -3406,18 +3406,26 @@ function addShipmentBatch() {
     proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm);
   }
 
-  // LOT INPUT VALIDATION FOR RECEIVING: Alert and isolate new/unknown lots
+  // LOT INPUT VALIDATION FOR RECEIVING: Alert and isolate first-time seen lots
   if (currentMode === 'receiving') {
     const expected = file.expectedLots || [];
     const alreadyReceived = (file.receiving.entries || []).some(e => e.lot === lot);
     
-    if (!alreadyReceived && expected.length > 0 && !expected.includes(lot)) {
+    if (!alreadyReceived) {
+      // First time seeing this lot in the current file
+      const isExpected = (expected.length === 0 || expected.includes(lot));
+      
+      let msg = "";
+      if (!isExpected) {
+        msg = `🛑 <b>تنبيه عزل ومعاينة صارم:</b><br><br>رقم الحصة "${lot}" <b>غير مدرج إطلاقاً في العقد</b>، ويتم استلامه لأول مرة!<br><br>يرجى <b>عزل هذه المنصة على حدة للمعاينة والتحقق</b> من مطابقتها للمورد.<br><br>هل تريد الاستمرار وتسجيلها كحصة إضافية/دخيلة في النظام؟`;
+      } else {
+        msg = `⚠️ <b>تنبيه دخول حصة جديدة:</b><br><br>هذه هي <b>المرة الأولى</b> التي يتم فيها إدخال الحصة "${lot}" (وإن كانت مدرجة في العقد).<br><br>يرجى <b>وضع هذه المنصة على حدة للمعاينة</b> كنموذج استهلالي لهذه الحصة.<br><br>هل تريد المتابعة وتسجيلها؟`;
+      }
+
       askConfirmation(() => {
         continueValidationAndAdd();
-      }, `🛑 تنبيه عزل ومعاينة: رقم الحصة "${lot}" غير مدرج في قائمة الحصص المتوقعة للعقد، ولم يتم تدوينه في هذا الملف من قبل!<br><br>يرجى <b>عزل هذه المنصة للمعاينة والتحقق</b> من أنها مطابقة للمورد.<br><br>هل تريد الاستمرار وتسجيلها كحصة إضافية/دخيلة في النظام الآن؟`);
+      }, msg);
       return;
-    } else if (!alreadyReceived) {
-      showToast(`ℹ️ تنبيه: يتم الآن تدوين رقم الحصة "${lot}" لأول مرة في هذا الملف.`);
     }
   }
 
@@ -5938,5 +5946,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24d652dcd3e6cb8',t:'MTc4NTY3Njk4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24d730afce3881b',t:'MTc4NTY3NzU1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
