@@ -3194,23 +3194,56 @@ function addShipmentBatch() {
     return;
   }
 
+  const pw = palletWeight(file);
+  const currentEntryWeight = numPallets * pw + numBags * (parseFloat(file.bagWeight) || 25) / 1000;
+
+  // STRICT LOT BALANCE CHECK FOR DELIVERIES (منع تسليم كمية أكبر من الرصيد الفعلي للحصة)
+  if(currentMode === 'delivery') {
+    let lotRec = 0, lotTorn = 0, lotDel = 0;
+    (file.receiving.entries || []).forEach(e => {
+      if(e.lot === lot) {
+        lotRec += entryWeight(e, file);
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(file.bagWeight) || 25) / 1000;
+        lotTorn += ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+      }
+    });
+    (file.deliveries || []).forEach(d => {
+      (d.entries || []).forEach(e => {
+        if(e.lot === lot) lotDel += entryWeight(e, file);
+      });
+    });
+    const lotRealAvailable = Math.max(0, lotRec - lotTorn - lotDel);
+
+    if (lotRealAvailable < currentEntryWeight - 0.001) {
+      showAlertModal(`🛑 <b>عجز في المخزون الفعلي:</b><br><br>لا يمكنك تسليم هذه الشحنة! الرصيد المتبقي من الحصة <b>"${lot}"</b> في المستودع هو <b>(${formatTons(lotRealAvailable)} طن)</b> فقط، بينما الشحنة المطلوبة تعادل <b>(${formatTons(currentEntryWeight)} طن)</b>.<br><br>يرجى اختيار حصة أخرى متوفرة أو تقليل الكمية المطلوبة.`);
+      return;
+    }
+  }
+
   // Check allocation certificate max quantity limits (تنبيه/منع برمجي في حال تجاوز الكمية القصوى)
   if(currentMode === 'delivery' && currentDeliveryId) {
     const activeDelivery = file.deliveries.find(d => d.id === currentDeliveryId);
     if(activeDelivery && activeDelivery.targetTons > 0) {
-      const pw = palletWeight(file);
       let prevDelivered = 0;
       activeDelivery.entries.forEach(e => {
-        prevDelivered += e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
+        prevDelivered += entryWeight(e, file);
       });
-      const currentEntryWeight = numPallets * pw + numBags * (parseFloat(file.bagWeight) || 25) / 1000;
-      if(prevDelivered + currentEntryWeight > activeDelivery.targetTons + 0.0001) {
-        // Warning notification display initial stock quantity available as well as requested (إظهار الكمية الفعلية الموجودة في المخزن)
-        let totalWarehouseStock = 0;
+      if(prevDelivered + currentEntryWeight > activeDelivery.targetTons + 0.001) {
+        // Calculate true net stock of the entire warehouse for info
+        let totalRec = 0, totalTorn = 0, totalDel = 0;
         (file.receiving.entries || []).forEach(e => {
-          totalWarehouseStock += e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
+          totalRec += entryWeight(e, file);
+          const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(file.bagWeight) || 25) / 1000;
+          totalTorn += ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
         });
-        showAlertModal(`🛑 منع حماية المخزون: لا يمكن تسجيل هذه الشحنة لأنها ستتجاوز الكمية القصوى المعتمدة في شهادة التخصيص للزبون وهي: (${activeDelivery.targetTons} طن). المتبقي الحالي فقط هو: (${formatTons(Math.max(0, activeDelivery.targetTons - prevDelivered))} طن). الكمية الفعلية المتوفرة حالياً كلياً داخل المخزن هي: (${formatTons(totalWarehouseStock)} طن).`);
+        (file.deliveries || []).forEach(d => {
+          (d.entries || []).forEach(e => {
+            totalDel += entryWeight(e, file);
+          });
+        });
+        const totalWarehouseStock = Math.max(0, totalRec - totalTorn - totalDel);
+        
+        showAlertModal(`🛑 <b>منع حماية خطة التخصيص:</b><br><br>لا يمكن تسجيل هذه الشحنة لأنها ستتجاوز <b>الكمية القصوى المعتمدة للزبون</b> (${activeDelivery.targetTons} طن).<br><br>المتبقي له في الشهادة هو: <b>(${formatTons(Math.max(0, activeDelivery.targetTons - prevDelivered))} طن)</b>.<br><br><span style="font-size:11px;">(للعلم: إجمالي المخزون الصافي بالباخرة ككل هو: ${formatTons(totalWarehouseStock)} طن).</span>`);
         return;
       }
     }
@@ -5383,26 +5416,48 @@ function closeEditFileModal(save) {
       showToast("⚠️ لا يمكن حفظ الملف برقم فارغ!");
       return;
     }
+    
+    const file = getFile(currentFileId);
+    if (!file) return;
+    
+    // Check if the user is changing critical math variables while entries exist
+    const newBagsPerPallet = parseInt(document.getElementById('efBagsPerPallet').value) || 56;
+    const newBagWeight = parseFloat(document.getElementById('efBagWeight').value) || 25;
+    
+    const hasEntries = (file.receiving && file.receiving.entries && file.receiving.entries.length > 0) || 
+                       (file.deliveries && file.deliveries.some(d => d.entries && d.entries.length > 0));
+                       
+    const hasMathChanged = (file.bagsPerPallet !== newBagsPerPallet) || (file.bagWeight !== newBagWeight);
 
-    updateFile(currentFileId, f => {
-      f.fileNumber = fileNum;
-      f.powderType = document.getElementById('efPowderType').value;
-      f.contractNumber = document.getElementById('efContract').value.trim() || '—';
-      f.contractDate = document.getElementById('efContractDate').value || '—';
-      f.supplier = document.getElementById('efSupplier').value.trim() || '—';
-      f.contractedQty = parseFloat(document.getElementById('efContractedQty').value) || 0;
-      f.bagsPerPallet = parseInt(document.getElementById('efBagsPerPallet').value) || 56;
-      f.bagWeight = parseFloat(document.getElementById('efBagWeight').value) || 25;
-      f.warehouse = document.getElementById('efWarehouse').value.trim() || 'سعيدة 1';
-      f.vessel = document.getElementById('efVessel').value.trim() || '—';
-      f.arrivalDate = document.getElementById('efArrivalDate').value || '—';
-      f.productionDate = document.getElementById('efProductionDate').value || '—';
-      f.expiryDate = document.getElementById('efExpiryDate').value || '—';
-    });
+    const applySave = () => {
+      updateFile(currentFileId, f => {
+        f.fileNumber = fileNum;
+        f.powderType = document.getElementById('efPowderType').value;
+        f.contractNumber = document.getElementById('efContract').value.trim() || '—';
+        f.contractDate = document.getElementById('efContractDate').value || '—';
+        f.supplier = document.getElementById('efSupplier').value.trim() || '—';
+        f.contractedQty = parseFloat(document.getElementById('efContractedQty').value) || 0;
+        f.bagsPerPallet = newBagsPerPallet;
+        f.bagWeight = newBagWeight;
+        f.warehouse = document.getElementById('efWarehouse').value.trim() || 'سعيدة 1';
+        f.vessel = document.getElementById('efVessel').value.trim() || '—';
+        f.arrivalDate = document.getElementById('efArrivalDate').value || '—';
+        f.productionDate = document.getElementById('efProductionDate').value || '—';
+        f.expiryDate = document.getElementById('efExpiryDate').value || '—';
+      });
 
-    addLog(`⚙️ تم تعديل وتحديث معطيات الملف النشط: ${fileNum}`);
-    showToast("⚙️ تم حفظ وتثبيت كافة تعديلات معطيات الملف النشط بنجاح!");
-    renderAll();
+      addLog(`⚙️ تم تعديل وتحديث معطيات الملف النشط: ${fileNum}`);
+      showToast("⚙️ تم حفظ وتثبيت كافة تعديلات معطيات الملف النشط بنجاح!");
+      renderAll();
+    };
+
+    if (hasEntries && hasMathChanged) {
+      askConfirmation(() => {
+        applySave();
+      }, `⚠️ <b>تنبيه هام جداً:</b><br><br>هذا الملف يحتوي بالفعل على شحنات مسجلة! تعديلك لـ (وزن الكيس) أو (عدد الأكياس في المنصة) الآن سيؤدي إلى <b>تغيير الحساب الكلي للأوزان التراكمية بأثر رجعي</b> لجميع الشحنات المسجلة والمؤرشفة في هذا الملف!<br><br>هل أنت متأكد من تطبيق هذا التغيير الحسابي؟`);
+    } else {
+      applySave();
+    }
   }
 }
 
@@ -5771,5 +5826,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254988f0ffb2833',t:'MTc4NTc1MjQ5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254b0175e97e1b5',t:'MTc4NTc1MzQ1NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
