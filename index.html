@@ -2366,32 +2366,46 @@ function closeAlertModal() {
 }
 
 // Active Operation configuration
-function setOperationMode(mode) {
-  currentMode = mode;
-  const receiveBtn = document.getElementById('mode-receive');
-  const deliverBtn = document.getElementById('mode-deliver');
+function setOperationMode(mode, bypassConfirmation = false) {
+  if (currentMode === mode) return;
 
-  const deductTornBagsCheckedContainer = document.getElementById('deductTornBagsCheckedContainer');
-  const generalTornBagsInputs = document.getElementById('generalTornBagsInputs');
+  const performSwitch = () => {
+    currentMode = mode;
+    const receiveBtn = document.getElementById('mode-receive');
+    const deliverBtn = document.getElementById('mode-deliver');
 
-  if(mode === 'receiving') {
-    receiveBtn.className = 'tab-switch-btn active-receive';
-    deliverBtn.className = 'tab-switch-btn';
-    document.getElementById('activeDeliveryControls').style.display = 'none';
-    
-    // Show Torn bags configuration in Receiving tab
-    if(deductTornBagsCheckedContainer) deductTornBagsCheckedContainer.style.display = 'flex';
-    if(generalTornBagsInputs) generalTornBagsInputs.style.display = 'flex';
+    const deductTornBagsCheckedContainer = document.getElementById('deductTornBagsCheckedContainer');
+    const generalTornBagsInputs = document.getElementById('generalTornBagsInputs');
+
+    if(mode === 'receiving') {
+      receiveBtn.className = 'tab-switch-btn active-receive';
+      deliverBtn.className = 'tab-switch-btn';
+      document.getElementById('activeDeliveryControls').style.display = 'none';
+      
+      // Show Torn bags configuration in Receiving tab
+      if(deductTornBagsCheckedContainer) deductTornBagsCheckedContainer.style.display = 'flex';
+      if(generalTornBagsInputs) generalTornBagsInputs.style.display = 'flex';
+    } else {
+      receiveBtn.className = 'tab-switch-btn';
+      deliverBtn.className = 'tab-switch-btn active-deliver';
+      document.getElementById('activeDeliveryControls').style.display = 'block';
+
+      // Exclude/Remove Torn Bags inputs/switches completely from Delivery mode
+      if(deductTornBagsCheckedContainer) deductTornBagsCheckedContainer.style.display = 'none';
+      if(generalTornBagsInputs) generalTornBagsInputs.style.display = 'none';
+    }
+    renderAll();
+  };
+
+  if (!bypassConfirmation) {
+    const modeName = mode === 'receiving' ? 'استلام شحنات (تخزين)' : 'تسليم للزبائن (خروج)';
+    askConfirmation(() => {
+      performSwitch();
+      showToast(`تم التغيير إلى وضع ${modeName}`);
+    }, `⚠️ <b>تغيير وضع العمل:</b><br><br>هل أنت متأكد من تغيير وضع العمل في الشاشة الرئيسية إلى: <b>"${modeName}"</b>؟`);
   } else {
-    receiveBtn.className = 'tab-switch-btn';
-    deliverBtn.className = 'tab-switch-btn active-deliver';
-    document.getElementById('activeDeliveryControls').style.display = 'block';
-
-    // Exclude/Remove Torn Bags inputs/switches completely from Delivery mode (إلغاء الممزق كلياً من التسليم)
-    if(deductTornBagsCheckedContainer) deductTornBagsCheckedContainer.style.display = 'none';
-    if(generalTornBagsInputs) generalTornBagsInputs.style.display = 'none';
+    performSwitch();
   }
-  renderAll();
 }
 
 // Collapsible shipment register (طوي وبسط سجل الشاحنات)
@@ -2884,7 +2898,7 @@ function calculateTonsToPallets() {
 
 function resumeUnclosedDelivery(deliveryId) {
   currentDeliveryId = deliveryId;
-  setOperationMode('delivery');
+  setOperationMode('delivery', true);
   showToast("🔄 تم بنجاح استئناف ومتابعة التسليم للعميل المختار!");
   renderAll();
 }
@@ -3744,17 +3758,24 @@ function renderFilesList() {
 }
 
 function selectActiveFile(id) {
-  currentFileId = id;
-  localStorage.setItem(LAST_FILE_KEY, id);
-  const file = getFile(id);
-  if (file) {
-    const tornWeightInput = document.getElementById('generalTornBagWeight');
-    if (tornWeightInput) {
-      tornWeightInput.value = file.bagWeight || 25;
+  const fileToActivate = getFile(id);
+  if (!fileToActivate) return;
+
+  // Don't ask for confirmation if it's already the active file (just clicked the same card)
+  if (currentFileId === id) return;
+
+  askConfirmation(() => {
+    currentFileId = id;
+    localStorage.setItem(LAST_FILE_KEY, id);
+    if (fileToActivate) {
+      const tornWeightInput = document.getElementById('generalTornBagWeight');
+      if (tornWeightInput) {
+        tornWeightInput.value = fileToActivate.bagWeight || 25;
+      }
     }
-  }
-  showToast("📁 تم تحديد وتنشيط الملف المختار!");
-  renderAll();
+    showToast("📁 تم تحديد وتنشيط الملف المختار!");
+    renderAll();
+  }, `🔄 <b>تأكيد انتقال وتغيير الملف:</b><br><br>هل أنت متأكد من انتقالك للعمل وتنشيط الملف رقم <b>"${fileToActivate.fileNumber}"</b>؟<br><br>جميع العمليات القادمة (تسجيل شاحنات أو فتح حسابات زبائن) ستُسجل وتُخصم أوتوماتيكياً من هذا الملف.`);
 }
 
 function deleteActiveFileConfirm() {
@@ -3944,9 +3965,15 @@ function renderStockOverview() {
 // VIEW: CUSTOMERS BALANCES & DELIVERIES
 // -------------------------------------------------------------
 function startNewDelivery() {
-  const file = getFile(currentFileId);
+  const selectedFileId = document.getElementById('deliveryFileSelect').value;
+  if(!selectedFileId) {
+    showToast("⚠️ يرجى تحديد الملف الأصلي المراد السحب منه أولاً!");
+    return;
+  }
+  
+  const file = getFile(selectedFileId);
   if(!file) {
-    showToast("⚠️ يرجى تحديد ملف نشط قبل إعداد التسليم!");
+    showToast("⚠️ الملف المختار غير موجود!");
     return;
   }
 
@@ -3972,22 +3999,28 @@ function startNewDelivery() {
     entries: []
   };
 
-  updateFile(currentFileId, f => {
-    f.deliveries.push(delivery);
-  });
+  askConfirmation(() => {
+    updateFile(selectedFileId, f => {
+      f.deliveries = f.deliveries || [];
+      f.deliveries.push(delivery);
+    });
 
-  currentDeliveryId = delivery.id;
-  addLog(`تم بدء عملية تسليم جديدة للزبون: ${customerName} بمقدار ${targetTons} طن.`);
-  showToast("✅ تم إنشاء وتفعيل خطة التسليم للزبون!");
-  
-  document.getElementById('deliveryCustomerInput').value = '';
-  document.getElementById('deliveryCustomerAddress').value = '';
-  document.getElementById('deliveryCertNo').value = '';
-  document.getElementById('deliveryCertDate').value = '';
-  document.getElementById('deliveryTargetTons').value = '';
+    currentFileId = selectedFileId; // Switch context to this file immediately
+    localStorage.setItem(LAST_FILE_KEY, selectedFileId);
+    currentDeliveryId = delivery.id;
+    
+    addLog(`تم بدء عملية تسليم يدوية جديدة للزبون: ${customerName} بمقدار ${targetTons} طن من الملف ${file.fileNumber}.`);
+    showToast("✅ تم إنشاء وتفعيل خطة التسليم للزبون!");
+    
+    document.getElementById('deliveryCustomerInput').value = '';
+    document.getElementById('deliveryCustomerAddress').value = '';
+    document.getElementById('deliveryCertNo').value = '';
+    document.getElementById('deliveryCertDate').value = '';
+    document.getElementById('deliveryTargetTons').value = '';
 
-  setOperationMode('delivery');
-  switchView('home');
+    setOperationMode('delivery', true);
+    switchView('home');
+  }, `⚠️ <b>تأكيد التوجيه اليدوي (Affectation Manuelle):</b><br><br>هل أنت متأكد من فتح حساب جديد للزبون <b>"${customerName}"</b> بوزن <b>(${targetTons} طن)</b> وربطه ليخصم سلعته من الملف / الباخرة <b>"${file.fileNumber}"</b> (مستودع ${file.warehouse || 'سعيدة 1'})؟`);
 }
 
 function renderCustomerBalances() {
@@ -4937,28 +4970,30 @@ function decodeCentralAllocationCode() {
     checkpoints: []
   };
 
-  updateFile(currentFileId, f => {
-    f.deliveries = f.deliveries || [];
-    // Prevent duplicates of the same certificate number in the same file
-    if (f.deliveries.some(d => d.certNumber === certNumber)) {
-      showAlertModal(`🛑 تنبيه: شهادة التخصيص رقم "${certNumber}" مسجلة ومفعلة بالفعل في هذا الملف سابقاً! لا يمكن تكرار تسجيل نفس الشهادة.`);
-      return;
-    }
-    f.deliveries.push(newDelivery);
-    currentDeliveryId = newDelivery.id; // Switch active delivery to this new one instantly!
-    
-    addLog(`[ربط مركزي] تم تلقائيًا فك تشفير كود العاصمة لـ ${customerName} وفتح حسابه شهادة: ${certNumber} كمية: ${weightVal} طن`);
-    showAlertModal(`✅ <b>تم فك تشفير كود العاصمة بنجاح ومطابقته!</b><br><br>` +
-      `👤 <b>اسم الملبنة:</b> ${customerName}<br>` +
-      `🔑 <b>رقم الشهادة:</b> <span dir="ltr">${certNumber}</span><br>` +
-      `📅 <b>تاريخ ووقت إصدار الرمز:</b> ${certDate} (ساعة ${certTime})<br>` +
-      `🥛 <b>نوع البودرة:</b> بودرة دسم ${powderType}<br>` +
-      `⚖️ <b>الكمية المعتمدة:</b> ${weightVal} طن<br><br>` +
-      `📂 <b>تم فتح حساب الزبون وتثبيت كواطته في ملف الشحنة النشط رقم (${file.fileNumber}) فوراً!</b>`, "فك تشفير الرمز بنجاح 🎉", false);
-    
-    document.getElementById('centralCodeInput').value = '';
-    renderAll();
-  });
+  askConfirmation(() => {
+    updateFile(currentFileId, f => {
+      f.deliveries = f.deliveries || [];
+      // Prevent duplicates of the same certificate number in the same file
+      if (f.deliveries.some(d => d.certNumber === certNumber)) {
+        showAlertModal(`🛑 تنبيه: شهادة التخصيص رقم "${certNumber}" مسجلة ومفعلة بالفعل في هذا الملف سابقاً! لا يمكن تكرار تسجيل نفس الشهادة.`);
+        return;
+      }
+      f.deliveries.push(newDelivery);
+      currentDeliveryId = newDelivery.id; // Switch active delivery to this new one instantly!
+      
+      addLog(`[ربط مركزي] تم تلقائيًا فك تشفير كود العاصمة لـ ${customerName} وفتح حسابه شهادة: ${certNumber} كمية: ${weightVal} طن`);
+      showAlertModal(`✅ <b>تم فك تشفير كود العاصمة بنجاح ومطابقته!</b><br><br>` +
+        `👤 <b>اسم الملبنة:</b> ${customerName}<br>` +
+        `🔑 <b>رقم الشهادة:</b> <span dir="ltr">${certNumber}</span><br>` +
+        `📅 <b>تاريخ ووقت إصدار الرمز:</b> ${certDate} (ساعة ${certTime})<br>` +
+        `🥛 <b>نوع البودرة:</b> بودرة دسم ${powderType}<br>` +
+        `⚖️ <b>الكمية المعتمدة:</b> ${weightVal} طن<br><br>` +
+        `📂 <b>تم فتح حساب الزبون وتثبيت كواطته في ملف الشحنة النشط رقم (${file.fileNumber}) فوراً!</b>`, "فك تشفير الرمز بنجاح 🎉", false);
+      
+      document.getElementById('centralCodeInput').value = '';
+      renderAll();
+    });
+  }, `⚠️ <b>تأكيد التوجيه (Affectation):</b><br><br>النظام يستعد لفك تشفير هذا الكود وفتح حساب للزبون <b>"${customerName}"</b> بوزن <b>(${weightVal} طن)</b>.<br><br>هل أنت متأكد أنك تريد أن يخصم هذا الزبون سلعته من الملف/الباخرة النشطة حالياً <b>"${file.fileNumber}"</b> (مستودع ${file.warehouse || 'سعيدة 1'})؟`);
 }
 
 function copyGcCodeToClipboard() {
@@ -5736,5 +5771,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2547e6f4ec02818',t:'MTc4NTc1MTQyMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254988f0ffb2833',t:'MTc4NTc1MjQ5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
