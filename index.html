@@ -4524,14 +4524,14 @@ async function reprintCheckpoint(cpIndex) {
   if(currentMode === 'receiving') {
     checkpoints = file.receivingCheckpoints || [];
     allEntries = file.receiving.entries || [];
-    title = "وصل استلام (أرشيف) — Bon de Réception (Reprint)";
+    title = "<span dir='ltr'>Bon de Réception (Reprint) — وصل استلام (أرشيف)</span>";
     prefixName = "Reprint_Reception";
   } else {
     const d = file.deliveries.find(x => x.id === currentDeliveryId);
     if (d) {
       checkpoints = d.checkpoints || [];
       allEntries = d.entries || [];
-      title = "سند خروج (أرشيف) — Bon de Sortie (Reprint)";
+      title = "<span dir='ltr'>Bon de Sortie (Reprint) — سند خروج (أرشيف)</span>";
     }
     prefixName = "Reprint_Livraison";
   }
@@ -4559,7 +4559,7 @@ async function reprintCheckpoint(cpIndex) {
   }
 
   const formattedSeq = currCp.seq || "000";
-  document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false, currCp.actualDate);
+  document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false, currCp.actualDate, true);
   
   // Generate QR Code
   const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, currCp.tons || 0, currCp.actualDate);
@@ -5736,5 +5736,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2545eb8fcedb93b',t:'MTc4NTc1MDEyMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25468023aecba9b',t:'MTc4NTc1MDUwMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
