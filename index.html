@@ -1688,9 +1688,14 @@ tr:hover {
         <div id="gcGeneratedCodeResult" style="display: none; background-color: rgba(47, 143, 212, 0.06); padding: 10px; border-radius: 6px; border: 1px dashed var(--fb-blue); margin-top: 10px; text-align: center;">
           <div style="font-size: 11px; font-weight: bold; opacity: 0.8; color: var(--text-current);">الرمز التشفيري المولد لإرساله للمخزن:</div>
           <div id="gcCodeText" style="font-size: 14px; font-weight: 900; font-family: monospace; color: var(--fb-blue); margin: 6px 0; word-break: break-all; direction: ltr;"></div>
-          <button class="btn btn-small" onclick="copyGcCodeToClipboard()" style="padding: 4px 8px; font-size: 11px; margin: 0 auto; display: inline-flex; align-items: center; gap: 4px;">
-            <i class="fa-solid fa-copy"></i> نسخ الرمز لرسالة SMS/WhatsApp
-          </button>
+          <div style="display:flex; gap:8px; margin-top:8px;">
+            <button class="btn btn-secondary" onclick="copyGcCodeToClipboard()" style="flex:1; font-size: 11px; padding: 6px; min-height: unset;">
+              <i class="fa-solid fa-copy"></i> نسخ الكود
+            </button>
+            <button class="btn btn-success" onclick="sendCodeViaWhatsApp()" style="flex:1; background-color:#25D366; border-color:#25D366; color:white; font-size: 11px; padding: 6px; min-height: unset; font-weight:bold;">
+              <i class="fa-brands fa-whatsapp" style="font-size:14px;"></i> إرسال للزبون
+            </button>
+          </div>
         </div>
 
         <!-- Section: Generate Digital Key File -->
@@ -5041,6 +5046,18 @@ function copyGcCodeToClipboard() {
   });
 }
 
+function sendCodeViaWhatsApp() {
+  const code = document.getElementById('gcCodeText').textContent;
+  const custName = document.getElementById('gcCustomerInput').value.trim() || 'زبوننا الكريم';
+  const tons = document.getElementById('gcTargetTons').value || '0';
+  const certNo = document.getElementById('gcCertNo').value || '';
+  
+  const msg = `مرحباً ${custName}،\n\nتُعلمكم الإدارة المركزية للديوان الوطني المهني للحليب (ONIL) أنه تم إصدار وتفعيل شهادة التخصيص الخاصة بكم (رقم: ${certNo}) بكمية معتمدة قدرها *${tons} طن*.\n\nالرمز التشفيري الخاص بسحب حصتكم هو:\n${code}\n\nيرجى التوجه للمستودع الجهوي (غرب) وتقديم هذا الرمز للمطابقة والاستلام.\nشكراً.`;
+  
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
+  window.open(whatsappUrl, '_blank');
+}
+
 function unlockCentralGenerator() {
   const code = prompt("🔑 يرجى إدخال الرمز السري للإدارة المركزية بالجزائر العاصمة لفتح أداة التوليد:");
   const cleanCode = code ? code.trim().toUpperCase() : "";
@@ -5840,5 +5857,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254d025db88a9cc',t:'MTc4NTc1NDc2OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2559b2bfefae240',t:'MTc4NTc2MzA4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
