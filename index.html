@@ -5230,18 +5230,26 @@ function renderAIPredictor() {
   let dailyRate = 3.800; // Default fallback (3.8 tons per day)
   let rateExplanation = '(معدل افتراضي آمن)';
 
-  if (allDeliveries.length >= 2) {
-    const last5 = allDeliveries.slice(-5);
-    const firstTs = last5[0].ts;
-    const lastTs = last5[last5.length - 1].ts;
+  // AI Logic: We need at least 3 deliveries over a span of time to establish a reliable kinetic pattern
+  if (allDeliveries.length >= 3) {
+    // We look at the last 10 deliveries to establish a smoothing moving average (SMA)
+    const recentDeliveries = allDeliveries.slice(-10);
+    const firstTs = recentDeliveries[0].ts;
+    const lastTs = recentDeliveries[recentDeliveries.length - 1].ts;
     const daysDiff = (lastTs - firstTs) / (1000 * 60 * 60 * 24);
     
-    if (daysDiff > 0.01) {
+    if (daysDiff > 0.5) { // Needs at least half a day difference to be statistically significant
       let totalTons = 0;
-      last5.forEach(x => totalTons += x.weight);
+      recentDeliveries.forEach(x => totalTons += x.weight);
+      
+      // Calculate true kinetic rate
       dailyRate = totalTons / daysDiff;
-      if (dailyRate < 0.1) dailyRate = 3.800; // avoid divide by zero/infinitesimal rate
-      else rateExplanation = '(محتسب حركياً من سحوبات الملبنات الميدانية)';
+      
+      // Apply realistic bounds (avoid anomalies like 100 tons a day if someone just registered 3 trucks in 5 minutes)
+      if (dailyRate < 0.5) dailyRate = 3.800; 
+      if (dailyRate > 50) dailyRate = 50; // Cap at 50 tons a day maximum to prevent wild predictions
+      
+      rateExplanation = '(محتسب حركياً من متوسط آخر سحوبات ميدانية للملبنات)';
     }
   }
 
@@ -5861,5 +5869,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a256eb4fd9ee12c0',t:'MTc4NTc3Njg1Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2570c5f0dd92980',t:'MTc4NTc3ODIwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
