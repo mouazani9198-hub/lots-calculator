@@ -2280,9 +2280,15 @@ function showToast(msg) {
 }
 
 // Toast confirmations (Pop-up)
-function askConfirmation(action, msg) {
+function askConfirmation(action, msg, htmlContent = '') {
   confirmAction = action;
-  document.getElementById('confirmModalBody').textContent = msg;
+  const body = document.getElementById('confirmModalBody');
+  if (htmlContent) {
+    body.innerHTML = msg + htmlContent;
+  } else {
+    body.textContent = msg; // Text content prevents XSS for normal strings
+    body.innerHTML = msg; // Use innerHTML to allow basic tags like <b> and <br>
+  }
   document.getElementById('confirmModal').classList.add('active');
 }
 
@@ -4454,7 +4460,7 @@ async function closeBatchAndPrint() {
       showToast("⚠️ تم حفظ وإغلاق الوصل بنجاح، لكن تعذر توليد ملف الـ PDF. يمكنك طباعته من سجل الوصولات لاحقاً.");
     }
     renderAll();
-  }, `🔒 إغلاق وقفل دفعة اليوم لملف "${file.fileNumber}" — سيتم قفلها وإصدار وصل برقم متسلسل مستقل للوزن الإجمالي الصافي للدفعة الحالية وهو (${formatTons(calculatedTotal)} طن). هل أنت متأكد؟`);
+  }, `🔒 إغلاق وقفل دفعة اليوم لملف "${file.fileNumber}" — سيتم قفلها وإصدار وصل برقم متسلسل مستقل للوزن الإجمالي الصافي للدفعة الحالية وهو (${formatTons(calculatedTotal)} طن). هل أنت متأكد؟`, datePromptHtml);
 }
 
 // --- REPRINT PREVIOUS RECEIPTS FEATURE ---
@@ -5730,5 +5736,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2544fde8e68ba8d',t:'MTc4NTc0OTUxNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2545eb8fcedb93b',t:'MTc4NTc1MDEyMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
