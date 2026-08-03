@@ -3811,6 +3811,7 @@ function selectActiveFile(id) {
 
   askConfirmation(() => {
     currentFileId = id;
+    currentDeliveryId = ''; // CRITICAL SYNC FIX: Reset delivery context when switching files to prevent ghost allocations
     localStorage.setItem(LAST_FILE_KEY, id);
     if (fileToActivate) {
       const tornWeightInput = document.getElementById('generalTornBagWeight');
@@ -3834,6 +3835,7 @@ function deleteActiveFileConfirm() {
     const list = loadFiles().filter(f => f.id !== currentFileId);
     saveFiles(list);
     currentFileId = list.length > 0 ? list[0].id : '';
+    currentDeliveryId = ''; // CRITICAL SYNC FIX: Reset delivery context when deleting active file
     localStorage.setItem(LAST_FILE_KEY, currentFileId);
     addLog(`تم حذف ملف شحنة نهائياً.`);
     showToast("🗑️ تم حذف الملف بنجاح!");
@@ -5869,5 +5871,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2570c5f0dd92980',t:'MTc4NTc3ODIwNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
