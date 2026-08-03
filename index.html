@@ -1662,7 +1662,7 @@ tr:hover {
         <div class="form-row">
           <div class="field">
             <label style="color: var(--text-current);">رقم شهادة التخصيص</label>
-            <input type="text" id="gcCertNo" placeholder="مثال: 1514/E">
+            <input type="text" id="gcCertNo" placeholder="مثال: 1514/E" dir="ltr" style="text-align: left;">
           </div>
           <div class="field">
             <label style="color: var(--text-current);">تاريخ الشهادة</label>
@@ -5052,7 +5052,7 @@ function sendCodeViaWhatsApp() {
   const tons = document.getElementById('gcTargetTons').value || '0';
   const certNo = document.getElementById('gcCertNo').value || '';
   
-  const msg = `مرحباً ${custName}،\n\nتُعلمكم الإدارة المركزية للديوان الوطني المهني للحليب (ONIL) أنه تم إصدار وتفعيل شهادة التخصيص الخاصة بكم (رقم: ${certNo}) بكمية معتمدة قدرها *${tons} طن*.\n\nالرمز التشفيري الخاص بسحب حصتكم هو:\n${code}\n\nيرجى التوجه للمستودع الجهوي (غرب) وتقديم هذا الرمز للمطابقة والاستلام.\nشكراً.`;
+  const msg = `مرحباً ${custName}،\n\nتُعلمكم الإدارة المركزية للديوان الوطني المهني للحليب (ONIL) أنه تم إصدار وتفعيل شهادة التخصيص الخاصة بكم (رقم: ${certNo}) بكمية معتمدة قدرها *${tons} طن*.\n\nالرمز التشفيري الخاص بسحب حصتكم هو:\n${code}\n\n⚠️ يرجى العلم أن هذا الرمز صالح للاستخدام فقط ما لم يتم تدوير المفاتيح الأمنية في النظام المركزي. يُنصح بالتوجه فوراً للمستودع الجهوي (غرب) للبدء في الاستلام.\nشكراً.`;
   
   const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(msg)}`;
   window.open(whatsappUrl, '_blank');
@@ -5857,5 +5857,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2559b2bfefae240',t:'MTc4NTc2MzA4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a256deea7bfdd959',t:'MTc4NTc3NjM0NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
