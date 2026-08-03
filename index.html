@@ -4146,10 +4146,14 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
       deliveryDetailsHTML = `
         <div class="pi-customer-box" style="margin-top: 10px;">
           <div style="margin-bottom: 5px; font-size: 14px; color: #2F8FD4;"><b>معلومات زبون التخصيص (Client et Affectation)</b></div>
-          <div><b>اسم العميل الكامل:</b> ${activeDelivery.customerName}</div>
-          <div><b>عنوان العميل:</b> ${activeDelivery.customerAddress || 'غير محدد'}</div>
-          <div><b>رقم شهادة التخصيص:</b> <span dir="ltr" style="direction: ltr; display: inline-block;">${activeDelivery.certNumber}</span> | <b>تاريخ الشهادة:</b> ${activeDelivery.certDate || '—'}</div>
-          <div style="margin-top:4px; color:var(--fb-red);"><b>الكمية القصوى المعتمدة للشهادة:</b> ${activeDelivery.targetTons} طن | <b>الكميات السابقة المسلمة:</b> ${formatTons(prevDeliveredWeight)} طن | <b>المتبقي الصافي للعميل بعد هذا السحب:</b> ${formatTons(remainingBalance)} طن</div>
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+            <div>اسم العميل الكامل: <b>${activeDelivery.customerName}</b></div>
+            <div>رقم شهادة التخصيص: <b dir="ltr" style="direction: ltr; display: inline-block;">${activeDelivery.certNumber}</b></div>
+            <div>تاريخ الشهادة: <b>${activeDelivery.certDate || '—'}</b></div>
+            <div>الكمية القصوى المعتمدة للشهادة: <b style="color:var(--fb-red);">${activeDelivery.targetTons} طن</b></div>
+            <div>الكميات السابقة المسلمة: <b>${formatTons(prevDeliveredWeight)} طن</b></div>
+            <div>المتبقي الصافي للعميل بعد هذا السحب: <b style="color:var(--fb-red);">${formatTons(remainingBalance)} طن</b></div>
+          </div>
         </div>
       `;
     }
@@ -4220,12 +4224,13 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
         <div class="sig-title">رئيس مخزن ديوان الحليب</div>
         <div style="margin-top:40px; font-size:10px; opacity:0.6;">التوقيع والختم</div>
       </div>
-      <!-- Added Customer Signature / Stamp / Fingerprint column safely -->
+      ${!isDraft && currentMode === 'delivery' ? `
       <div class="pi-sig-block">
-        <div class="sig-title">المستلم (الزبون/الناقل)</div>
+        <div class="sig-title">المستلم (الزبون / الناقل)</div>
         <div style="font-size:10px; text-align:right; margin:10px 0; opacity:0.8;">الاسم: ................................<br>رقم الشاحنة: ..........................</div>
         <div style="font-size:9px; opacity:0.6; margin-top:15px;">(الختم، التوقيع، البصمة)</div>
       </div>
+      ` : ''}
     </div>
     
     <!-- Secure Audit Hash and QR Code for Tamper Prevention -->
@@ -5684,5 +5689,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a24f7ea15a7f3805',t:'MTc4NTY5OTAwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
