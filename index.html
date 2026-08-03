@@ -5551,10 +5551,12 @@ function exportAllToExcelActual() {
       (f.receiving.entries || []).forEach(e => {
         recTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
         
-        // Calculate torn bags weight to deduct from received
-        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
-        const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
-        totalTornDeduction += entryTornW;
+        // Calculate torn bags weight to deduct from received ONLY IF the global option is enabled
+        if (deductTornBagsChecked) {
+          const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+          const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+          totalTornDeduction += entryTornW;
+        }
       });
       recTons -= totalTornDeduction;
 
@@ -5573,8 +5575,11 @@ function exportAllToExcelActual() {
         if (!lotMap[e.lot]) lotMap[e.lot] = 0;
         
         const entryW = entryWeight(e, f);
-        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
-        const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+        let entryTornW = 0;
+        if (deductTornBagsChecked) {
+          const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+          entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+        }
         
         lotMap[e.lot] += (entryW - entryTornW);
       });
@@ -5698,7 +5703,10 @@ function exportAllToExcelActual() {
           (f.receiving.entries || []).forEach(e => {
             if (e.ts < startTs) {
               const entryGross = e.bags ? (e.bags * bagW) : pw;
-              const entryTorn = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * ((parseFloat(e.tornBagWeight)||parseFloat(f.bagWeight)||25)/1000);
+              let entryTorn = 0;
+              if (deductTornBagsChecked) {
+                entryTorn = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * ((parseFloat(e.tornBagWeight)||parseFloat(f.bagWeight)||25)/1000);
+              }
               recBefore += (entryGross - entryTorn);
             }
           });
@@ -5715,7 +5723,10 @@ function exportAllToExcelActual() {
           (f.receiving.entries || []).forEach(e => {
             if (e.ts >= startTs && e.ts <= endTs) {
               const entryGross = e.bags ? (e.bags * bagW) : pw;
-              const entryTorn = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * ((parseFloat(e.tornBagWeight)||parseFloat(f.bagWeight)||25)/1000);
+              let entryTorn = 0;
+              if (deductTornBagsChecked) {
+                entryTorn = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * ((parseFloat(e.tornBagWeight)||parseFloat(f.bagWeight)||25)/1000);
+              }
               inputsOfWeek += (entryGross - entryTorn);
             }
           });
@@ -5829,5 +5840,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254c0e35825b287',t:'MTc4NTc1NDE0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254d025db88a9cc',t:'MTc4NTc1NDc2OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
