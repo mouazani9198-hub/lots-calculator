@@ -2605,6 +2605,16 @@ function parseSpokenLot(text) {
 }
 
 function openOcrModal(lot) {
+  const file = getFile(currentFileId);
+  if(!file) {
+    showToast("⚠️ يرجى تحديد ملف شحنة نشط أولاً قبل الإدخال الذكي!");
+    return;
+  }
+  if(currentMode === 'delivery' && !currentDeliveryId) {
+    showToast("⚠️ الرجاء اختيار أو إنشاء زبون نشط للتسليم أولاً!");
+    return;
+  }
+  
   document.getElementById('ocrDetectedLotSpan').textContent = lot;
   document.getElementById('ocrPalletsInput').value = 1;
   document.getElementById('ocrLooseBagsInput').value = 0;
@@ -2616,79 +2626,21 @@ function closeOcrModal(save) {
   document.getElementById('ocrModal').classList.remove('active');
   if(save) {
     const lot = ocrDetectedLot;
-    const numPallets = parseInt(document.getElementById('ocrPalletsInput').value) || 1;
+    const numPallets = parseInt(document.getElementById('ocrPalletsInput').value) || 0;
     const numBags = parseInt(document.getElementById('ocrLooseBagsInput').value) || 0;
-    const truck = document.getElementById('ocrTruckInput').value.trim() || "OCR مسح";
+    const truck = document.getElementById('ocrTruckInput').value.trim() || "إدخال سريع";
 
     const file = getFile(currentFileId);
     if(!file) return;
 
-    // Direct automated validation warning if it doesn't match contract
-    const expected = file.expectedLots || [];
-    if(expected.length > 0 && !expected.includes(lot)) {
-      showAlertModal(`⚠️ رقم الحصة "${lot}" الملتقط بالكاميرا غير صحيح أو غير مدرج في العقد الأصلي لهذا الملف! الحصص المتوقعة: (${expected.join(' - ')}).`);
-      return;
-    }
-
-    // STRICT LOT MATCHING VALIDATION FOR DELIVERIES (منع تسليم رقم حصة غير مستلم بالمستودع مسبقاً)
-    if(currentMode === 'delivery') {
-      const receivedLots = (file.receiving.entries || []).map(e => e.lot);
-      if(!receivedLots.includes(lot)) {
-        let totalWarehouseStock = 0;
-        const pw = palletWeight(file);
-        (file.receiving.entries || []).forEach(e => {
-          totalWarehouseStock += e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
-        });
-        showAlertModal(`🛑 خطأ في مطابقة الشحنة (OCR): رقم الحصة "${lot}" غير متوفر للتسليم في هذا الملف! الحصص المتاحة للتسليم هي فقط الحصص المستلمة سابقاً: (${[...new Set(receivedLots)].join(' - ') || 'لا توجد حصص مستلمة بعد'}). الرصيد الفعلي الإجمالي المتوفر في المخزن هو: (${formatTons(totalWarehouseStock)} طن).`);
-        return;
-      }
-    }
-
-    // Check allocation certificate max quantity limits (تنبيه/منع برمجي في حال تجاوز الكمية القصوى)
-    if(currentMode === 'delivery' && currentDeliveryId) {
-      const activeDelivery = file.deliveries.find(d => d.id === currentDeliveryId);
-      if(activeDelivery && activeDelivery.targetTons > 0) {
-        const pw = palletWeight(file);
-        let prevDelivered = 0;
-        activeDelivery.entries.forEach(e => {
-          prevDelivered += e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
-        });
-        const currentEntryWeight = numPallets * pw + numBags * (parseFloat(file.bagWeight) || 25) / 1000;
-        if(prevDelivered + currentEntryWeight > activeDelivery.targetTons + 0.0001) {
-          // Warning notification display initial stock quantity available as well as requested (إظهار الكمية الفعلية الموجودة في المخزن)
-          let totalWarehouseStock = 0;
-          (file.receiving.entries || []).forEach(e => {
-            totalWarehouseStock += e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
-          });
-          showAlertModal(`🛑 منع حماية المخزون: لا يمكن تسجيل هذه الشحنة لأنها ستتجاوز الكمية القصوى المعتمدة في شهادة التخصيص للزبون وهي: (${activeDelivery.targetTons} طن). المتبقي الحالي فقط هو: (${formatTons(Math.max(0, activeDelivery.targetTons - prevDelivered))} طن). الكمية الفعلية المتوفرة حالياً كلياً داخل المخزن هي: (${formatTons(totalWarehouseStock)} طن).`);
-          return;
-        }
-      }
-    }
-
-    // Smart duplication and bags entry save
-    const entriesToAdd = [];
-    const baseTs = Date.now();
-    for(let i=0; i<numPallets; i++) {
-      entriesToAdd.push({ lot, ts: baseTs + i, truck });
-    }
-    if(numBags > 0) {
-      entriesToAdd.push({ lot, ts: baseTs + numPallets + 1, bags: numBags, truck });
-    }
-
-    updateFile(currentFileId, f => {
-      if(currentMode === 'receiving') {
-        f.receiving.entries.push(...entriesToAdd);
-      } else {
-        const d = f.deliveries.find(x => x.id === currentDeliveryId);
-        if(d) d.entries.push(...entriesToAdd);
-      }
-    });
-
-    addLog(`[OCR] تم تصوير وتحديد الحصة ${lot} وتسجيل ${numPallets} منصات.`);
-    showToast("✅ تم تسجيل الحصة والكمية الملتقطة ضوئياً بنجاح!");
-    speakLotNumber(lot); // Trigger lightning fast voice synthesis confirmation
-    renderAll();
+    // Use the exact same consolidated validation function to avoid code desync
+    // To do this, we populate the manual form and trigger the main addShipmentBatch function
+    document.getElementById('quickLotNumber').value = lot;
+    document.getElementById('opTruckNumber').value = truck;
+    document.getElementById('opPalletsCount').value = numPallets;
+    document.getElementById('opLooseBagsCount').value = numBags;
+    
+    addShipmentBatch();
   }
 }
 
@@ -5871,5 +5823,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25741efac880d46',t:'MTc4NTc4MDQwMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
