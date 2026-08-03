@@ -4097,15 +4097,17 @@ function buildLetterheadHTML(){
   `;
 }
 
-function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, closedDateStr = null) {
-  // Only display the quantities received/delivered during the current closed session's entries (تصفية وإدراج كميات الوصل الحالي فقط)
-  const checkpoints = (currentMode === 'receiving') ? (file.receivingCheckpoints || []) : ((file.deliveries.find(d => d.id === currentDeliveryId) || {}).checkpoints || []);
-  const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
+function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, closedDateStr = null, isReprint = false) {
+  let displayEntries = entries;
   
-  // Filter entries to show only those belonging to the current un-checkpointed session
-  const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
+  if (!isReprint) {
+    // Only display the quantities received/delivered during the current closed session's entries
+    const checkpoints = (currentMode === 'receiving') ? (file.receivingCheckpoints || []) : ((file.deliveries.find(d => d.id === currentDeliveryId) || {}).checkpoints || []);
+    const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
+    displayEntries = entries.filter(e => e.ts > lastCheckpointTs);
+  }
 
-  const tally = getLotsTally(currentSessionEntries, file);
+  const tally = getLotsTally(displayEntries, file);
   const pw = palletWeight(file);
   const bagW = (parseFloat(file.bagWeight) || 25) / 1000;
 
@@ -4127,11 +4129,11 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     `;
   }).join('') || `<tr><td colspan="3">لا توجد حصص مسجلة في هذا الوصل</td></tr>`;
 
-  const calculatedTotal = currentSessionEntries.reduce((s,e) => s + entryWeight(e, file), 0);
+  const calculatedTotal = displayEntries.reduce((s,e) => s + entryWeight(e, file), 0);
   const totalTornBags = totalPF + totalPM;
   let tornWeightDeduction = 0;
   if(deductTornBagsChecked) {
-    currentSessionEntries.forEach(e => {
+    displayEntries.forEach(e => {
       const pfVal = parseFloat(e.pf) || 0;
       const pmVal = parseFloat(e.pm) || 0;
       const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(file.bagWeight) || 25) / 1000;
@@ -4148,7 +4150,22 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     if(activeDelivery) {
       // Calculate previous delivered weights under this allocation certificate
       let prevDeliveredWeight = 0;
-      activeDelivery.entries.filter(e => e.ts <= lastCheckpointTs).forEach(e => {
+      
+      // If reprinting, we need to calculate previous weight UP TO the start of this reprinted chunk
+      // However, to keep it simple and safe for the UI display, we'll just show the total previous weight 
+      // excluding the current chunk's weight.
+      let allBeforeThisChunk = [];
+      if (!isReprint) {
+        const checkpoints = activeDelivery.checkpoints || [];
+        const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
+        allBeforeThisChunk = activeDelivery.entries.filter(e => e.ts <= lastCheckpointTs);
+      } else {
+        // Find the earliest TS in this reprinted chunk
+        const earliestTsInChunk = displayEntries.length > 0 ? Math.min(...displayEntries.map(e => e.ts)) : 0;
+        allBeforeThisChunk = activeDelivery.entries.filter(e => e.ts < earliestTsInChunk);
+      }
+      
+      allBeforeThisChunk.forEach(e => {
         prevDeliveredWeight += e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
       });
       const remainingBalance = Math.max(0, activeDelivery.targetTons - prevDeliveredWeight - finalNetWeight);
@@ -5713,5 +5730,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254426e5afd2820',t:'MTc4NTc0ODk2Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2544fde8e68ba8d',t:'MTc4NTc0OTUxNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
