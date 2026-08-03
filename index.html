@@ -2184,7 +2184,8 @@ function saveLogs(list){ localStorage.setItem(SYSTEM_LOGS_KEY, JSON.stringify(li
 
 function addLog(text){
   const logs = loadLogs();
-  logs.unshift({ id: Date.now(), text, time: new Date().toLocaleTimeString('ar-DZ', {hour: '2-digit', minute:'2-digit'}) });
+  // Using hour12: false for 24-hour format (e.g., 20:30) which is standard in industry
+  logs.unshift({ id: Date.now(), text, time: new Date().toLocaleTimeString('ar-DZ', {hour: '2-digit', minute:'2-digit', hour12: false}) });
   if(logs.length > 50) logs.pop();
   saveLogs(logs);
   renderNotifications();
@@ -3424,7 +3425,7 @@ function renderShipmentEntriesTable() {
     // Use the unique timestamp instead of array index to prevent filtered array mismatch bugs
     const entryTs = e.ts;
     const weightVal = e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
-    const timeStr = new Date(e.ts).toLocaleTimeString('ar-DZ', {hour: '2-digit', minute:'2-digit'});
+    const timeStr = new Date(e.ts).toLocaleTimeString('ar-DZ', {hour: '2-digit', minute:'2-digit', hour12: false});
 
     const row = document.createElement('tr');
     row.innerHTML = `
@@ -5698,5 +5699,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25410588e5fba88',t:'MTc4NTc0NjkxMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2543208db0bba90',t:'MTc4NTc0ODI5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
