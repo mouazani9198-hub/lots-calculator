@@ -4097,7 +4097,7 @@ function buildLetterheadHTML(){
   `;
 }
 
-function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
+function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, closedDateStr = null) {
   // Only display the quantities received/delivered during the current closed session's entries (تصفية وإدراج كميات الوصل الحالي فقط)
   const checkpoints = (currentMode === 'receiving') ? (file.receivingCheckpoints || []) : ((file.deliveries.find(d => d.id === currentDeliveryId) || {}).checkpoints || []);
   const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
@@ -4202,7 +4202,10 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft) {
         </div>
       </div>
       ${deliveryDetailsHTML}
-      <div style="margin-top: 5px; font-weight: bold;">تاريخ ووقت الطباعة: <b>${new Date().toLocaleString('ar-DZ')}</b></div>
+      <div style="margin-top: 5px; font-weight: bold; border-top: 1px dashed #ddd; padding-top: 5px;">
+        ${closedDateStr ? `تاريخ الإنجاز الفعلي في الميدان: <b style="color:var(--fb-green); margin-left: 15px;">${closedDateStr}</b>` : ''}
+        تاريخ ووقت طباعة النظام: <b>${new Date().toLocaleString('ar-DZ')}</b>
+      </div>
     </div>
 
     <table class="pi-table">
@@ -4368,7 +4371,17 @@ async function closeBatchAndPrint() {
 
   const calculatedTotal = currentSessionEntries.reduce((s,e) => s + entryWeight(e, file), 0);
 
+  // Ask for actual field date before closing
+  const datePromptHtml = `
+    <div style="margin: 15px 0;">
+      <label style="display:block; margin-bottom:8px; font-weight:bold;">الرجاء تحديد تاريخ الاستلام/التسليم الفعلي في الميدان لتثبيته في الوصل:</label>
+      <input type="date" id="actualFieldDateInput" style="width:100%; padding:10px; font-size:16px; border:2px solid var(--fb-blue); border-radius:6px; font-weight:bold;" value="${new Date().toISOString().substring(0, 10)}">
+    </div>
+  `;
+
   askConfirmation(async () => {
+    const actualFieldDate = document.getElementById('actualFieldDateInput') ? document.getElementById('actualFieldDateInput').value : new Date().toISOString().substring(0, 10);
+    
     // Sequential counter increment securely
     let seqNum = parseInt(localStorage.getItem(seqKey)) || 1;
     const formattedSeq = String(seqNum).padStart(3, '0');
@@ -4384,10 +4397,10 @@ async function closeBatchAndPrint() {
     }
 
     // Build finalized non-draft printed HTML
-    document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, entries, title, formattedSeq, false);
+    document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, entries, title, formattedSeq, false, actualFieldDate);
     
     // Generate QR Code
-    const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, calculatedTotal);
+    const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, calculatedTotal, actualFieldDate);
     const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${calculatedTotal.toFixed(3)} | Hash: ${hash}`;
     try {
       new QRCode(document.getElementById(`invoiceQRCodeBox_${formattedSeq}`), {
@@ -4400,16 +4413,16 @@ async function closeBatchAndPrint() {
       });
     } catch(err) { console.error("QR Error", err); }
     
-    // Save checkpoint to database/localStorage so these entries are locked completely (قفل العملية تماماً ولا تفتح مجدداً)
+    // Save checkpoint to database/localStorage so these entries are locked completely
     updateFile(currentFileId, f => {
       if(currentMode === 'receiving') {
         f.receivingCheckpoints = f.receivingCheckpoints || [];
-        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal });
+        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, actualDate: actualFieldDate });
       } else {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
         if(d) {
           d.checkpoints = d.checkpoints || [];
-          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal });
+          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, actualDate: actualFieldDate });
         }
       }
     });
@@ -4457,11 +4470,12 @@ function openReceiptsHistoryModal() {
     [...checkpoints].reverse().forEach((cp, reversedIdx) => {
       // Find actual index to pass to reprint function
       const idx = checkpoints.length - 1 - reversedIdx;
+      const actualDateStr = cp.actualDate ? `(${cp.actualDate}) ` : '';
       const timeStr = new Date(cp.ts).toLocaleString('ar-DZ');
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td><b style="color:var(--fb-blue);">${cp.seq || '—'}</b></td>
-        <td style="direction:ltr;">${timeStr}</td>
+        <td style="direction:ltr; font-size:10px;">${actualDateStr}<br><span style="opacity:0.6">${timeStr}</span></td>
         <td><b>${formatTons(cp.tons || 0)}</b></td>
         <td>
           <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px; margin:0;" onclick="reprintCheckpoint(${idx})">
@@ -4522,10 +4536,10 @@ async function reprintCheckpoint(cpIndex) {
   }
 
   const formattedSeq = currCp.seq || "000";
-  document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false);
+  document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false, currCp.actualDate);
   
   // Generate QR Code
-  const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, currCp.tons || 0);
+  const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, currCp.tons || 0, currCp.actualDate);
   const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${(currCp.tons || 0).toFixed(3)} | Hash: ${hash}`;
   try {
     new QRCode(document.getElementById(`invoiceQRCodeBox_${formattedSeq}`), {
@@ -5699,5 +5713,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2543208db0bba90',t:'MTc4NTc0ODI5MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254426e5afd2820',t:'MTc4NTc0ODk2Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
