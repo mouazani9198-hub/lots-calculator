@@ -3633,22 +3633,25 @@ function closeEditLotModal(save) {
       return;
     }
 
-    // Modify the exact lot name in existing entries to preserve timestamps and history
+    // Modify the exact lot name in ALL existing entries GLOBALLY in the file to preserve referential integrity
     updateFile(currentFileId, f => {
-      let entries = [];
-      if(currentMode === 'receiving') {
-        entries = f.receiving.entries;
-      } else {
-        const d = f.deliveries.find(x => x.id === currentDeliveryId);
-        if(d) entries = d.entries;
+      // 1. Rename in receiving
+      if (f.receiving && f.receiving.entries) {
+        f.receiving.entries.forEach(e => {
+          if (e.lot === currentEditingLot) e.lot = newLotNumber;
+        });
       }
-
-      // Rename the lot for all matching entries without touching their `ts`
-      entries.forEach(e => {
-        if (e.lot === currentEditingLot) {
-          e.lot = newLotNumber;
-        }
-      });
+      
+      // 2. Rename in ALL deliveries
+      if (f.deliveries) {
+        f.deliveries.forEach(d => {
+          if (d.entries) {
+            d.entries.forEach(e => {
+              if (e.lot === currentEditingLot) e.lot = newLotNumber;
+            });
+          }
+        });
+      }
     });
     
     // We only update the PF/PM or counts if the user actually changes them.
@@ -5826,5 +5829,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254b0175e97e1b5',t:'MTc4NTc1MzQ1NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a254c0e35825b287',t:'MTc4NTc1NDE0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
