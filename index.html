@@ -3697,7 +3697,9 @@ function renderFilesList() {
     (f.receiving.entries || []).forEach(e => {
       if(!e.lot) return;
       if(!lotMap[e.lot]) lotMap[e.lot] = 0;
-      lotMap[e.lot] += entryWeight(e, f);
+      const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+      const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+      lotMap[e.lot] += (entryWeight(e, f) - entryTornW);
     });
     (f.deliveries || []).forEach(d => {
       (d.entries || []).forEach(e => {
@@ -3852,9 +3854,16 @@ function renderStockOverview() {
     list.forEach(f => {
       const pw = palletWeight(f);
       let recTons = 0;
+      let totalTornDeduction = 0;
+
       (f.receiving.entries || []).forEach(e => {
         recTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+        const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+        totalTornDeduction += entryTornW;
       });
+      recTons -= totalTornDeduction;
+
       let delTons = 0;
       (f.deliveries || []).forEach(d => {
         (d.entries || []).forEach(e => {
@@ -5689,5 +5698,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-</body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25410588e5fba88',t:'MTc4NTc0NjkxMg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
