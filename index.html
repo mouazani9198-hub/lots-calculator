@@ -5017,6 +5017,66 @@ function exportAllToExcelActual() {
   document.head.appendChild(script);
 }
 
+// --- FORCE APP UPDATE & CLEAR CACHE ---
+function forceAppUpdate() {
+  if (confirm("🔄 هل تريد تحديث التطبيق ومسح التخزين المؤقت وحل مشكلة عدم ظهور التعديلات الجديدة؟ سيقوم هذا بتحديث كافة الشاشات والوصولات فوراً دون حذف ملفاتك.")) {
+    showToast("⏳ جاري تحديث النظام ومسح الكاش...");
+    
+    // 1. Unregister all service workers
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function(registrations) {
+        for(let registration of registrations) {
+          registration.unregister();
+        }
+      });
+    }
+
+    // 2. Clear Cache Storage completely
+    if ('caches' in window) {
+      caches.keys().then(function(names) {
+        for (let name of names) {
+          caches.delete(name);
+        }
+      });
+    }
+
+    // 3. Force hard reload using dynamic query parameter to bypass ANY cache
+    setTimeout(() => {
+      window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
+    }, 1000);
+  }
+}
+
+// --- PWA NATIVE INSTALL CONTROL ---
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredPrompt = e;
+  const installBtn = document.getElementById('pwaInstallBtn');
+  if (installBtn) {
+    installBtn.style.display = 'inline-flex';
+  }
+});
+
+function installPWA() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        showToast("📲 رائع! تم قبول تثبيت التطبيق بنجاح.");
+      } else {
+        console.log('User dismissed PWA install');
+      }
+      deferredPrompt = null;
+    });
+  } else {
+    showAlertModal(`📱 لتثبيت حاسبة الحصص وإخفاء الرابط وشريط العنوان تماماً:\n\n1. اضغط على النقاط الثلاث (⋮) في أعلى يمين متصفح Chrome.\n2. اختر "إضافة إلى الشاشة الرئيسية" (Ajouter à l'écran d'accueil) أو "تثبيت التطبيق".\n3. افتحه الآن مباشرة من أيقونة الهاتف الخارجية ليعمل بكامل الشاشة وبدون أي رابط خارجي كأنه تطبيق رسمي محمل من المتجر!`, "تثبيت التطبيق على الهاتف 📲", false);
+  }
+}
+
+// Initialize application on load
+renderAll();
+
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25d7eb3abdf09ad',t:'MTc4NTg0NTgwNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25d9cf3af179845',t:'MTc4NTg0NzA0Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
