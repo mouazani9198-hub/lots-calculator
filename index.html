@@ -2157,10 +2157,11 @@ function toggleDeductTornBags() {
 
 function closeConfirmModal(accepted) {
   document.getElementById('confirmModal').classList.remove('active');
-  if(accepted && confirmAction) {
-    confirmAction();
+  const actionToExecute = confirmAction;
+  confirmAction = null; // Clear it before executing to prevent wiping out chained confirmations
+  if(accepted && actionToExecute) {
+    actionToExecute();
   }
-  confirmAction = null;
 }
 
 // Center-screen warning/success alert modal dynamically
@@ -2434,10 +2435,8 @@ function parseSpokenLot(text) {
     } else {
       // Check characters
       for(let char of w) {
-        if(char >= '0' && char <= '9') {
-          result += char;
-        } else if (char === 'e' || char === 'E') {
-          result += 'E';
+        if((char >= '0' && char <= '9') || (char >= 'a' && char <= 'z') || (char >= 'A' && char <= 'Z')) {
+          result += char.toUpperCase();
         }
       }
     }
@@ -2991,6 +2990,11 @@ function addShipmentBatch() {
       showAlertModal(`🛑 خطأ في مطابقة الشحنة: رقم الحصة "${lot}" غير متوفر للتسليم في هذا الملف! الحصص المتاحة للتسليم هي فقط الحصص المستلمة سابقاً: (${[...new Set(receivedLots)].join(' - ') || 'لا توجد حصص مستلمة بعد'}).`);
       return;
     }
+  }
+
+  if (numPallets === 0 && numBags === 0) {
+    showToast("⚠️ الرجاء تحديد عدد المنصات أو الأكياس لتسجيل العملية!");
+    return;
   }
 
   if(currentMode === 'delivery' && !currentDeliveryId) {
@@ -5142,5 +5146,5 @@ function installPWA() {
 renderAll();
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25e0a734f49d07f',t:'MTc4NTg1MTUyOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25e56ae5b73a4a7',t:'MTc4NTg1NDY1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
