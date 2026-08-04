@@ -2419,11 +2419,20 @@ function speakLotVoiceAlert() {
 function parseSpokenLot(text) {
   text = text.toLowerCase().trim();
   
-  // Replace spoken Arabic digits with standard English numbers
+  // Replace spoken Arabic digits with standard English numbers and common letters
   const mapping = {
     'صفر': '0', 'واحد': '1', 'إثنان': '2', 'اثنين': '2', 'ثلاثة': '3', 'تلاتة': '3',
     'أربعة': '4', 'ربعة': '4', 'خمسة': '5', 'ستة': '6', 'سبعة': '7', 'ثمانية': '8',
-    'تمانية': '8', 'تسعة': '9', 'إي': 'E', 'e': 'E', 'أي': 'A', 'a': 'A', 'أ': 'A', 'بي': 'B', 'b': 'B'
+    'تمانية': '8', 'تسعة': '9', 
+    'إي': 'E', 'e': 'E', 'أي': 'A', 'a': 'A', 'أ': 'A', 'آ': 'A',
+    'بي': 'B', 'b': 'B',
+    'سي': 'C', 'c': 'C',
+    'دي': 'D', 'd': 'D',
+    'إف': 'F', 'f': 'F',
+    'جي': 'G', 'g': 'G',
+    'أش': 'H', 'h': 'H',
+    'إكس': 'X', 'x': 'X',
+    'أغ': 'R', 'آر': 'R', 'r': 'R'
   };
 
   let result = '';
@@ -5154,5 +5163,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25ff84e78d8981f',t:'MTc4NTg3MTc1Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2601d43c9c01644',t:'MTc4NTg3MzI3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
