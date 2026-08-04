@@ -1293,13 +1293,6 @@ tr:hover {
         <button class="btn btn-success" onclick="exportAllToExcelActual()">
           <i class="fa-solid fa-file-excel"></i> تصدير كل شيء Excel
         </button>
-        <button class="btn btn-secondary" onclick="triggerBackup()">
-          <i class="fa-solid fa-cloud-arrow-up"></i> استخراج نسخة احتياطية (JSON)
-        </button>
-        <button class="btn btn-secondary" onclick="document.getElementById('restoreBackupInput').click()">
-          <i class="fa-solid fa-cloud-arrow-down"></i> استرجاع نسخة احتياطية
-        </button>
-        <input type="file" id="restoreBackupInput" style="display:none;" accept=".json" onchange="restoreBackup(event)">
         <button class="btn btn-secondary" onclick="adjustReceiptNumbering()">
           <i class="fa-solid fa-hashtag"></i> ضبط ترقيم الوصولات
         </button>
@@ -4158,13 +4151,9 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
       ` : ''}
     </div>
     
-    <!-- Secure Audit Hash and QR Code for Tamper Prevention -->
-    <div style="margin-top: 15px; border-top: 1px dashed #C7D8E8; padding-top: 10px; display: flex; align-items: center; justify-content: space-between; direction: ltr;">
-      <div id="invoiceQRCodeBox_${numberSeq}" style="width: 75px; height: 75px; padding: 2px; background: #fff;"></div>
-      <div style="text-align: right; font-size: 11px; font-family: monospace; color: #333;">
-        <div style="font-weight: bold; margin-bottom: 5px;">🔒 الرمز الأمني للتحقق (Secure Verification Code):</div>
-        <div style="font-weight: 900; color: #000; font-size: 13px; border: 1px solid #000; padding: 2px 6px; border-radius: 4px; background-color: #f2f2f2 !important; display: inline-block;">${generateSecureAuditHash(file.fileNumber, numberSeq, finalNetWeight)}</div>
-      </div>
+    <!-- Secure Audit Hash for Tamper Prevention -->
+    <div style="margin-top: 15px; text-align: center; font-size: 11px; font-family: monospace; color: #333; border-top: 1px dashed #C7D8E8; padding-top: 5px; direction: ltr;">
+      🔒 الرمز الأمني للتحقق (Secure Verification Code): <span style="font-weight: 900; color: #000; font-size: 13px; border: 1px solid #000; padding: 2px 6px; border-radius: 4px; background-color: #f2f2f2 !important;">${generateSecureAuditHash(file.fileNumber, numberSeq, finalNetWeight)}</span>
     </div>
     
     <!-- Added Official EPIC ONIL Footer Details safely as requested -->
@@ -4177,9 +4166,9 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
 async function loadPDFLibraries(){
   return new Promise((resolve, reject) => {
     let loaded = 0;
-    const checkDone = () => { loaded++; if(loaded === 3) resolve(); };
+    const checkDone = () => { loaded++; if(loaded === 2) resolve(); };
 
-    if(window.html2canvas && window.jspdf && window.QRCode){ resolve(); return; }
+    if(window.html2canvas && window.jspdf){ resolve(); return; }
     
     if(!window.html2canvas) {
       const s1 = document.createElement('script');
@@ -4199,14 +4188,7 @@ async function loadPDFLibraries(){
       document.head.appendChild(s2);
     } else checkDone();
 
-    if(!window.QRCode) {
-      const s3 = document.createElement('script');
-      s3.src = 'https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js';
-      s3.crossOrigin = 'anonymous';
-      s3.onload = checkDone;
-      s3.onerror = () => reject(new Error('تعذر تحميل qrcode'));
-      document.head.appendChild(s3);
-    } else checkDone();
+
   });
 }
 
@@ -4319,7 +4301,7 @@ async function closeBatchAndPrint() {
     // Build finalized non-draft printed HTML
     document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, entries, title, formattedSeq, false, actualFieldDate);
     
-    // Generate QR Code
+    // Generate QR Code inside piContent specifically for the printed invoice
     const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, calculatedTotal, actualFieldDate);
     const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${calculatedTotal.toFixed(3)} | Hash: ${hash}`;
     try {
@@ -4332,7 +4314,7 @@ async function closeBatchAndPrint() {
         correctLevel : QRCode.CorrectLevel.L
       });
     } catch(err) { console.error("QR Error", err); }
-    
+
     // Save checkpoint to database/localStorage so these entries are locked completely
     updateFile(currentFileId, f => {
       if(currentMode === 'receiving') {
@@ -4457,8 +4439,8 @@ async function reprintCheckpoint(cpIndex) {
 
   const formattedSeq = currCp.seq || "000";
   document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, cpEntries, title, formattedSeq, false, currCp.actualDate, true);
-  
-  // Generate QR Code
+
+  // Generate QR Code inside piContent specifically for the printed invoice
   const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, currCp.tons || 0, currCp.actualDate);
   const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${(currCp.tons || 0).toFixed(3)} | Hash: ${hash}`;
   try {
@@ -5036,5 +5018,5 @@ function exportAllToExcelActual() {
 }
 
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25d209f9f4209ad',t:'MTc4NTg0MTk1MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a25d4a2b2bd28f14',t:'MTc4NTg0MzY1Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
