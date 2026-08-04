@@ -1,15 +1,15 @@
 {
-  "name": "حاسبة الحصص",
-  "short_name": "حاسبة الحصص",
-  "description": "تطبيق حاسبة الحصص - ديوان الحليب",
+  "name": "ONIL ERP - ديوان الحليب",
+  "short_name": "ONIL ERP",
+  "description": "النظام اللوجستي الذكي لإدارة الحصص - الديوان الوطني المهني للحليب ومشتقاته",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "orientation": "portrait",
-  "background_color": "#ffffff",
-  "theme_color": "#0a1d30",
+  "orientation": "portrait-primary",
+  "background_color": "#F5F9FD",
+  "theme_color": "#2F8FD4",
   "dir": "rtl",
-  "lang": "ar",
+  "lang": "ar-DZ",
   "icons": [
     {
       "src": "icon-192.png",
