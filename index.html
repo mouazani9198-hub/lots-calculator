@@ -3628,8 +3628,11 @@ function renderFilesList() {
     (f.receiving.entries || []).forEach(e => {
       if(!e.lot) return;
       if(!lotMap[e.lot]) lotMap[e.lot] = 0;
-      const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
-      const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+      let entryTornW = 0;
+      if (deductTornBagsChecked) {
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+        entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+      }
       lotMap[e.lot] += (entryWeight(e, f) - entryTornW);
     });
     (f.deliveries || []).forEach(d => {
@@ -4072,18 +4075,29 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     const countStr = `${t.pallets} منصة ${t.looseBags > 0 ? '+ ' + t.looseBags + ' أكياس سائبة' : ''}`;
     let weight = t.pallets * pw + t.looseBags * bagW;
     
+    // Determine torn bags weight accurately per lot
+    let tornCountForLot = t.pf + t.pm;
+    
     // Deduct torn bags for this specific lot row if option is enabled
-    if (deductTornBagsChecked) {
-      const singleBagW = (parseFloat(file.bagWeight) || 25) / 1000;
-      // We assume torn bags for this lot were factored in the pf/pm sum
-      const tornDeductionForLot = (t.pf + t.pm) * singleBagW;
+    if (deductTornBagsChecked && tornCountForLot > 0) {
+      // Find the specific torn bag weight that was recorded for this lot's entries
+      // Default to file bagWeight if none found
+      let lotSingleBagW = (parseFloat(file.bagWeight) || 25) / 1000;
+      const lotEntry = displayEntries.find(e => e.lot === lot && (parseFloat(e.pf) > 0 || parseFloat(e.pm) > 0));
+      if (lotEntry && lotEntry.tornBagWeight) {
+        lotSingleBagW = parseFloat(lotEntry.tornBagWeight) / 1000;
+      }
+      
+      const tornDeductionForLot = tornCountForLot * lotSingleBagW;
       weight = Math.max(0, weight - tornDeductionForLot);
     }
+
+    const tornInfoStr = (tornCountForLot > 0) ? `<br><span style="font-size:10px; color:var(--fb-red);">(-${tornCountForLot} كيس ممزق)</span>` : '';
 
     return `
       <tr>
         <td style="font-weight:bold; font-size:14px;">${lot}</td>
-        <td>${countStr}</td>
+        <td>${countStr}${tornInfoStr}</td>
         <td>${formatTons(weight)}</td>
       </tr>
     `;
@@ -5217,5 +5231,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2653ee5be05a0e6',t:'MTc4NTkyNzA3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a26564461cbfc5a0',t:'MTc4NTkyODYwNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
