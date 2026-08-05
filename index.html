@@ -2077,6 +2077,14 @@ function formatTons(v){ return roundTo3(v).toLocaleString('fr-FR', {minimumFract
 window.addEventListener('DOMContentLoaded', () => {
   // Apply Saved theme
   const savedTheme = localStorage.getItem('fb_dark_mode') === 'true';
+function getLocalDateString() {
+  const d = new Date();
+  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
+  return d.toISOString().substring(0, 10);
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const savedTheme = localStorage.getItem('fb_dark_mode') === 'true';
   if(savedTheme){
     document.body.classList.add('dark-mode');
     document.getElementById('theme-toggle-btn').innerHTML = '<i class="fa-solid fa-sun"></i>';
@@ -2090,22 +2098,10 @@ window.addEventListener('DOMContentLoaded', () => {
   deductTornBagsChecked = savedDeduct;
   document.getElementById('deductTornBagsChecked').checked = deductTornBagsChecked;
 
-  // Populate Algiers simulation customer list
-  const gcDatalist = document.getElementById('gcCustomerDatalist');
-  if (gcDatalist) {
-    gcDatalist.innerHTML = DAIRY_LIST.map(d => `<option value="${d}">`).join('');
-  }
-  const gcDateInput = document.getElementById('gcCertDate');
-  if (gcDateInput) {
-    gcDateInput.value = new Date().toISOString().substring(0, 10);
-  }
   const auditDateInput = document.getElementById('auditDateInput');
   if (auditDateInput) {
-    auditDateInput.value = new Date().toISOString().substring(0, 10);
+    auditDateInput.value = getLocalDateString();
   }
-
-  // Preload Tesseract.js in the background for instant OCR (تحميل خلفي فوري ومسبق لتجنب بطء الكاميرا والرافعات)
-  loadTesseract().then(() => console.log('Tesseract preloaded!')).catch(e => console.error(e));
 
   renderAll();
 });
@@ -5186,5 +5182,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2618c7359be2833',t:'MTc4NTg4ODMxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2619bdfdfbb2833',t:'MTc4NTg4ODk0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
