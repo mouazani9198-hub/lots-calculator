@@ -4070,7 +4070,16 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     totalPF += t.pf;
     totalPM += t.pm;
     const countStr = `${t.pallets} منصة ${t.looseBags > 0 ? '+ ' + t.looseBags + ' أكياس سائبة' : ''}`;
-    const weight = t.pallets * pw + t.looseBags * bagW;
+    let weight = t.pallets * pw + t.looseBags * bagW;
+    
+    // Deduct torn bags for this specific lot row if option is enabled
+    if (deductTornBagsChecked) {
+      const singleBagW = (parseFloat(file.bagWeight) || 25) / 1000;
+      // We assume torn bags for this lot were factored in the pf/pm sum
+      const tornDeductionForLot = (t.pf + t.pm) * singleBagW;
+      weight = Math.max(0, weight - tornDeductionForLot);
+    }
+
     return `
       <tr>
         <td style="font-weight:bold; font-size:14px;">${lot}</td>
@@ -4170,9 +4179,9 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
         </div>
       </div>
       ${deliveryDetailsHTML}
-      <div style="margin-top: 5px; font-weight: bold; border-top: 1px dashed #ddd; padding-top: 5px;">
-        ${closedDateStr ? `تاريخ الإنجاز الفعلي في الميدان: <b style="color:var(--fb-green); margin-left: 15px;">${closedDateStr}</b>` : ''}
-        تاريخ ووقت طباعة النظام: <b>${new Date().toLocaleString('ar-DZ')}</b>
+      <div style="margin-top: 5px; font-weight: bold; border-top: 1px dashed #ddd; padding-top: 5px; display: flex; justify-content: space-between; align-items: center;">
+        <div>${closedDateStr ? `تاريخ الإنجاز الفعلي في الميدان: <b style="color:var(--fb-green);">${closedDateStr}</b>` : ''}</div>
+        <div>تاريخ ووقت طباعة النظام: <b>${new Date().toLocaleString('ar-DZ')}</b></div>
       </div>
     </div>
 
@@ -5208,5 +5217,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a261f404abdbd8be',t:'MTc4NTg5MjU1Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2653ee5be05a0e6',t:'MTc4NTkyNzA3Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
