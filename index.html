@@ -4215,7 +4215,7 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     <div class="pi-total">
       الوزن الصافي للدفعة الحالية المشمولة بالوصل: ${formatTons(finalNetWeight)} طن
       <div style="font-size:11px; font-weight:normal; margin-top:4px; color:#444;">
-         (مجموع الأكياس الممزقة PF/PM المستبعدة للوصل الحالي: ${totalTornBags} كيس / بوزن ${formatTons(totalTornBags * bagW)} طن | حالة الخصم: ${deductTornBagsChecked ? 'خصم مفعّل' : 'حساب بدون خصم'})
+         (مجموع الأكياس الممزقة PF/PM المستبعدة للوصل الحالي: ${totalTornBags} كيس / بوزن ${formatTons(tornWeightDeduction)} طن | حالة الخصم: ${deductTornBagsChecked ? 'خصم مفعّل' : 'حساب بدون خصم'})
       </div>
     </div>
 
@@ -5231,5 +5231,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a26564461cbfc5a0',t:'MTc4NTkyODYwNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2656c2e6b5e647c',t:'MTc4NTkyODkzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
