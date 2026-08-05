@@ -4363,12 +4363,12 @@ async function closeBatchAndPrint() {
   const datePromptHtml = `
     <div style="margin: 15px 0;">
       <label style="display:block; margin-bottom:8px; font-weight:bold;">الرجاء تحديد تاريخ الاستلام/التسليم الفعلي في الميدان لتثبيته في الوصل:</label>
-      <input type="date" id="actualFieldDateInput" style="width:100%; padding:10px; font-size:16px; border:2px solid var(--fb-blue); border-radius:6px; font-weight:bold;" value="${new Date().toISOString().substring(0, 10)}">
+      <input type="date" id="actualFieldDateInput" style="width:100%; padding:10px; font-size:16px; border:2px solid var(--fb-blue); border-radius:6px; font-weight:bold;" value="${getLocalDateString()}">
     </div>
   `;
 
   askConfirmation(async () => {
-    const actualFieldDate = document.getElementById('actualFieldDateInput') ? document.getElementById('actualFieldDateInput').value : new Date().toISOString().substring(0, 10);
+    const actualFieldDate = document.getElementById('actualFieldDateInput') ? document.getElementById('actualFieldDateInput').value : getLocalDateString();
     
     // Sequential counter increment securely
     let seqNum = parseInt(localStorage.getItem(seqKey)) || 1;
@@ -5231,5 +5231,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2656c2e6b5e647c',t:'MTc4NTkyODkzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2657b297944d7e9',t:'MTc4NTkyOTU0NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
