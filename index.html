@@ -877,7 +877,7 @@ tr:hover {
   }
   
   .fb-navbar {
-    padding: 0 5px;
+    padding: 0 4px;
     gap: 2px;
   }
   
@@ -887,11 +887,18 @@ tr:hover {
   
   .fb-tab {
     font-size: 16px;
+    padding: 0 4px;
   }
   
   .fb-brand {
     font-size: 16px;
     gap: 4px;
+  }
+
+  .circle-btn {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
   }
   
   body {
@@ -899,9 +906,6 @@ tr:hover {
   }
   
   .app-view {
-    padding-bottom: 60px;
-  }
-}
     padding-bottom: 60px;
   }
 }
@@ -975,9 +979,8 @@ tr:hover {
 
 <!-- --- FIXED TOP NAVBAR (FACEBOOK STYLE) --- -->
 <nav class="fb-navbar">
-  <a href="#" class="fb-brand" onclick="switchView('home'); return false;" title="حاسبة الحصص">
-    <i class="fa-solid fa-calculator"></i>
-    <span class="hide-on-mobile">حاسبة الحصص</span>
+  <a href="#" class="fb-brand" onclick="switchView('home'); return false;" title="الرئيسية">
+    <i class="fa-solid fa-calculator" style="font-size: 24px;"></i>
   </a>
   
   <div style="display: flex; gap: 5px; margin-right: 5px;">
@@ -2656,7 +2659,7 @@ function renderFEFORecommendation() {
 
   const card = document.createElement('div');
   card.style.cssText = `
-    background-color: var(--fb-bg-light);
+    background-color: var(--card-current);
     border: 1px solid var(--fb-blue);
     border-radius: 8px;
     padding: 10px 14px;
@@ -2666,7 +2669,7 @@ function renderFEFORecommendation() {
     display: flex;
     align-items: center;
     gap: 10px;
-    box-shadow: 0 2px 6px rgba(47, 143, 212, 0.1);
+    box-shadow: 0 2px 6px rgba(26, 115, 232, 0.15);
   `;
   card.innerHTML = `
     <i class="fa-solid fa-brain" style="color: var(--fb-blue); font-size: 18px; flex-shrink:0;"></i>
@@ -5205,5 +5208,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a261d8289d2aba96',t:'MTc4NTg5MTQxMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a261f404abdbd8be',t:'MTc4NTg5MjU1Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
