@@ -870,14 +870,38 @@ tr:hover {
   }
 }
 
-/* Ensure body doesn't get hidden behind floating bar on mobile */
+/* Mobile Responsiveness Rules */
 @media (max-width: 768px) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+  
+  .fb-navbar {
+    padding: 0 5px;
+    gap: 2px;
+  }
+  
+  .fb-nav-tabs {
+    gap: 2px;
+  }
+  
+  .fb-tab {
+    font-size: 16px;
+  }
+  
+  .fb-brand {
+    font-size: 16px;
+    gap: 4px;
+  }
+  
   body {
     padding-bottom: 160px !important; 
   }
   
-  /* Fix layout for small screens */
   .app-view {
+    padding-bottom: 60px;
+  }
+}
     padding-bottom: 60px;
   }
 }
@@ -951,20 +975,22 @@ tr:hover {
 
 <!-- --- FIXED TOP NAVBAR (FACEBOOK STYLE) --- -->
 <nav class="fb-navbar">
-  <a href="#" class="fb-brand" onclick="switchView('home'); return false;">
+  <a href="#" class="fb-brand" onclick="switchView('home'); return false;" title="حاسبة الحصص">
     <i class="fa-solid fa-calculator"></i>
-    <span>حاسبة الحصص</span>
+    <span class="hide-on-mobile">حاسبة الحصص</span>
   </a>
   
-  <!-- Force App Update Button to clear Sw cache on User Device -->
-  <button onclick="forceAppUpdate()" style="background-color: var(--fb-red); color: white; border: none; font-size: 9.5px; padding: 3px 6px; border-radius: 4px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 3px; z-index: 1100; width: auto; height: auto; margin: 0;">
-    <i class="fa-solid fa-arrows-rotate" style="font-size: 9px;"></i> تحديث 🔄
-  </button>
-  
-  <!-- PWA Install Button -->
-  <button id="pwaInstallBtn" onclick="installPWA()" style="background-color: var(--fb-blue); color: white; border: none; font-size: 9.5px; padding: 3px 6px; border-radius: 4px; font-weight: 800; cursor: pointer; display: inline-flex; align-items: center; gap: 3px; z-index: 1100; width: auto; height: auto; margin: 0; margin-right: 5px;">
-    <i class="fa-solid fa-mobile-screen-button" style="font-size: 9px;"></i> تثبيت التطبيق 📲
-  </button>
+  <div style="display: flex; gap: 5px; margin-right: 5px;">
+    <!-- Force App Update Button to clear Sw cache on User Device -->
+    <button onclick="forceAppUpdate()" style="background-color: var(--fb-red); color: white; border: none; font-size: 9.5px; padding: 4px 6px; border-radius: 4px; font-weight: 800; cursor: pointer; display: flex; align-items: center; gap: 4px; z-index: 1100;">
+      <i class="fa-solid fa-arrows-rotate" style="font-size: 10px;"></i> <span class="hide-on-mobile">تحديث</span> 🔄
+    </button>
+    
+    <!-- PWA Install Button -->
+    <button id="pwaInstallBtn" onclick="installPWA()" style="background-color: var(--fb-blue); color: white; border: none; font-size: 9.5px; padding: 4px 6px; border-radius: 4px; font-weight: 800; cursor: pointer; display: none; align-items: center; gap: 4px; z-index: 1100;">
+      <i class="fa-solid fa-mobile-screen-button" style="font-size: 10px;"></i> <span class="hide-on-mobile">تثبيت التطبيق</span> 📲
+    </button>
+  </div>
   
   <div class="fb-nav-tabs">
     <button id="tab-home" class="fb-tab active" onclick="switchView('home')" title="الرئيسية">
@@ -5182,5 +5208,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2619bdfdfbb2833',t:'MTc4NTg4ODk0Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a261b17bfc5a1644',t:'MTc4NTg4OTgyNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
