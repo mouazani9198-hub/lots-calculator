@@ -30,18 +30,35 @@ self.addEventListener('activate', (event) => {
   );
 });
 
-// استراتيجية: الشبكة أولاً، والكاش كخطة بديلة (بدون إنترنت)
-// هذا يمنع مشكلة "كاش قديم يحجب التحديثات" التي ظهرت سابقًا في تطبيق المستودع
+// استراتيجية: الكاش أولاً (العمل أوفلاين كلياً كأولوية)، ثم الشبكة إذا لم يكن الملف في الكاش.
+// إذا طلبنا تحديثاً، يمكننا الاعتماد على تخطي الكاش.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   event.respondWith(
-    fetch(event.request)
-      .then((response) => {
-        const clone = response.clone();
+    caches.match(event.request).then((cachedResponse) => {
+      // 1. Return cached response if we have it (OFFLINE FIRST)
+      if (cachedResponse) {
+        // Optionally fetch in background to update cache for next time (Stale-while-revalidate)
+        fetch(event.request).then((networkResponse) => {
+          caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, networkResponse);
+          });
+        }).catch(() => {}); // ignore network errors in background
+        return cachedResponse;
+      }
+      
+      // 2. If not in cache, try network
+      return fetch(event.request).then((networkResponse) => {
+        const clone = networkResponse.clone();
         caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+        return networkResponse;
+      }).catch(() => {
+        // 3. If offline and not in cache, fallback to index.html (useful for PWA routing)
+        if (event.request.mode === 'navigate') {
+          return caches.match('./index.html');
+        }
+      });
+    })
   );
 });
