@@ -24,20 +24,26 @@
 
 <style>
 :root {
-  /* --- COLD BLUE THEME VARIABLES (أزرق بارد) --- */
-  --fb-blue: #2F8FD4;
-  --fb-blue-hover: #1c72ac;
-  --fb-bg-light: #EBF3FC;
-  --fb-bg-dark: #0F1E2E;
+  /* --- FUN MILK BAG THEME VARIABLES (ألوان كيس الحليب المرحة) --- */
+  /* Primary blue from the milk bag */
+  --fb-blue: #1A73E8; 
+  --fb-blue-hover: #1557B0;
+  /* Light cyan/white background (like milk) */
+  --fb-bg-light: #F0F6FF;
+  --fb-bg-dark: #0D1B2A;
+  /* Clean white cards with a hint of blue shadow */
   --fb-card-light: #FFFFFF;
-  --fb-card-dark: #192D3E;
-  --fb-border-light: #C7D8E8;
+  --fb-card-dark: #162B44;
+  /* Soft borders */
+  --fb-border-light: #D2E3FC;
   --fb-border-dark: #2B4558;
-  --fb-text-light: #0D2132;
-  --fb-text-dark: #E6F1FC;
-  --fb-text-sec-light: #4A637A;
-  --fb-text-sec-dark: #A3BDD4;
-  --fb-green: #31A24C;
+  /* Dark text for high contrast */
+  --fb-text-light: #202124;
+  --fb-text-dark: #E8F0FE;
+  --fb-text-sec-light: #5F6368;
+  --fb-text-sec-dark: #9AA0A6;
+  /* Action colors */
+  --fb-green: #34A853;
   --fb-red: #FA3E3E;
   --fb-amber: #EAA800;
 
@@ -490,6 +496,23 @@ input:focus, select:focus {
 
 .input-addon-btn:hover {
   background-color: rgba(0,0,0,0.06);
+}
+
+.active-file-strip {
+  background-color: var(--fb-blue);
+  color: #fff !important;
+  padding: 10px 14px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14.5px;
+  font-weight: 800;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+.active-file-strip span {
+  color: #fff !important;
 }
 
 /* Accordion */
@@ -2614,7 +2637,7 @@ function renderFEFORecommendation() {
 
   const card = document.createElement('div');
   card.style.cssText = `
-    background-color: #EBF3FC;
+    background-color: var(--fb-bg-light);
     border: 1px solid var(--fb-blue);
     border-radius: 8px;
     padding: 10px 14px;
@@ -5163,5 +5186,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2601d43c9c01644',t:'MTc4NTg3MzI3MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2618c7359be2833',t:'MTc4NTg4ODMxMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
