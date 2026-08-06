@@ -2084,6 +2084,17 @@ let deductTornBagsChecked = true; // Option to deduct or just count
 let ocrDetectedLot = ''; // Temporarily stored detected lot number via OCR
 
 // Global functions
+
+function escapeHtml(unsafe) {
+  if (typeof unsafe !== "string") return unsafe;
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
 function loadFiles(){ try{ return JSON.parse(localStorage.getItem(FILES_KEY)) || []; }catch(e){ return []; } }
 function saveFiles(list){ localStorage.setItem(FILES_KEY, JSON.stringify(list)); }
 function loadLogs(){ try { return JSON.parse(localStorage.getItem(SYSTEM_LOGS_KEY)) || []; } catch(e){ return []; } }
@@ -2151,13 +2162,6 @@ function switchView(viewId) {
   if(targetView) targetView.classList.add('active');
 
   // Populate security settings inputs if switching to security view
-  if (viewId === 'security') {
-    const oldSaltInput = document.getElementById('cryptoOldSalt');
-    if (oldSaltInput) {
-      oldSaltInput.value = localStorage.getItem('onil_custom_salt') || "ONIL_SECRET_2026_WEST";
-    }
-  }
-
   // Show floating bar only on scrollable workspace view
   document.getElementById('floatingBottomBar').style.display = (viewId === 'home') ? 'flex' : 'none';
 
@@ -2613,7 +2617,7 @@ function renderUnclosedDeliveries() {
       padding:8px 12px; border-bottom:1px solid var(--border-current); font-size:12px;
     `;
     card.innerHTML = `
-      <span>📄 العميل: <b>${d.customerName}</b> (شهادة: <span dir="ltr" style="direction: ltr; display: inline-block;">${d.certNumber}</span>)</span>
+      <span>📄 العميل: <b>${escapeHtml(d.customerName)}</b> (شهادة: <span dir="ltr" style="direction: ltr; display: inline-block;">${escapeHtml(d.certNumber)}</span>)</span>
       <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px; font-weight:800;" onclick="resumeUnclosedDelivery('${d.id}')">
         <i class="fa-solid fa-rotate-right"></i> متابعة التسليم للزبون
       </button>
@@ -2780,7 +2784,7 @@ function updateActiveQuotaSelectOptions() {
     
     const opt = document.createElement('option');
     opt.value = d.id;
-    opt.textContent = `${d.customerName} - شهادة: \u200E${d.certNumber}\u200E (المتبقي: ${formatTons(remaining)} طن)`;
+    opt.textContent = `${escapeHtml(d.customerName)} - شهادة: \u200E${escapeHtml(d.certNumber)}\u200E (المتبقي: ${formatTons(remaining)} طن)`;
     if(d.id === currentDeliveryId) opt.selected = true;
     select.appendChild(opt);
   });
@@ -2802,7 +2806,7 @@ function updateDeliveryFileSelectOptions() {
   list.forEach(f => {
     const opt = document.createElement('option');
     opt.value = f.id;
-    opt.textContent = `ملف: ${f.fileNumber} (بودرة ${f.powderType} دسم)`;
+    opt.textContent = `ملف: ${escapeHtml(f.fileNumber)} (بودرة ${f.powderType} دسم)`;
     select.appendChild(opt);
   });
 }
@@ -3041,7 +3045,7 @@ function addShipmentBatch() {
   if(currentMode === 'delivery') {
     const receivedLots = (file.receiving.entries || []).map(e => e.lot);
     if(!receivedLots.includes(lot)) {
-      showAlertModal(`🛑 خطأ في مطابقة الشحنة: رقم الحصة "${lot}" غير متوفر للتسليم في هذا الملف! الحصص المتاحة للتسليم هي فقط الحصص المستلمة سابقاً: (${[...new Set(receivedLots)].join(' - ') || 'لا توجد حصص مستلمة بعد'}).`);
+      showAlertModal(`🛑 خطأ في مطابقة الشحنة: رقم الحصة "${escapeHtml(lot)}" غير متوفر للتسليم في هذا الملف! الحصص المتاحة للتسليم هي فقط الحصص المستلمة سابقاً: (${[...new Set(receivedLots)].join(' - ') || 'لا توجد حصص مستلمة بعد'}).`);
       return;
     }
   }
@@ -3079,7 +3083,7 @@ function addShipmentBatch() {
     const lotRealAvailable = Math.max(0, lotRec - lotTorn - lotDel);
 
     if (lotRealAvailable < currentEntryWeight - 0.001) {
-      showAlertModal(`🛑 <b>عجز في المخزون الفعلي:</b><br><br>لا يمكنك تسليم هذه الشحنة! الرصيد المتبقي من الحصة <b>"${lot}"</b> في المستودع هو <b>(${formatTons(lotRealAvailable)} طن)</b> فقط، بينما الشحنة المطلوبة تعادل <b>(${formatTons(currentEntryWeight)} طن)</b>.<br><br>يرجى اختيار حصة أخرى متوفرة أو تقليل الكمية المطلوبة.`);
+      showAlertModal(`🛑 <b>عجز في المخزون الفعلي:</b><br><br>لا يمكنك تسليم هذه الشحنة! الرصيد المتبقي من الحصة <b>"${escapeHtml(lot)}"</b> في المستودع هو <b>(${formatTons(lotRealAvailable)} طن)</b> فقط، بينما الشحنة المطلوبة تعادل <b>(${formatTons(currentEntryWeight)} طن)</b>.<br><br>يرجى اختيار حصة أخرى متوفرة أو تقليل الكمية المطلوبة.`);
       return;
     }
   }
@@ -3124,7 +3128,7 @@ function addShipmentBatch() {
 
     if(numPallets > 1) {
       askConfirmation(() => proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm), 
-        `⚠️ تأكيد لسلامة المخزون: هل أنت متأكد من تكرار تسجيل الحصة "${lot}" لعدد (${numPallets}) منّصات للشاحنة رقم "${truck}"؟`);
+        `⚠️ تأكيد لسلامة المخزون: هل أنت متأكد من تكرار تسجيل الحصة "${escapeHtml(lot)}" لعدد (${numPallets}) منّصات للشاحنة رقم "${escapeHtml(truck)}"؟`);
       return;
     }
 
@@ -3142,9 +3146,9 @@ function addShipmentBatch() {
       
       let msg = "";
       if (!isExpected) {
-        msg = `🛑 <b>تنبيه عزل ومعاينة صارم:</b><br><br>رقم الحصة "${lot}" <b>غير مدرج إطلاقاً في العقد</b>، ويتم استلامه لأول مرة!<br><br>يرجى <b>عزل هذه المنصة على حدة للمعاينة والتحقق</b> من مطابقتها للمورد.<br><br>هل تريد الاستمرار وتسجيلها كحصة إضافية/دخيلة في النظام؟`;
+        msg = `🛑 <b>تنبيه عزل ومعاينة صارم:</b><br><br>رقم الحصة "${escapeHtml(lot)}" <b>غير مدرج إطلاقاً في العقد</b>، ويتم استلامه لأول مرة!<br><br>يرجى <b>عزل هذه المنصة على حدة للمعاينة والتحقق</b> من مطابقتها للمورد.<br><br>هل تريد الاستمرار وتسجيلها كحصة إضافية/دخيلة في النظام؟`;
       } else {
-        msg = `⚠️ <b>تنبيه دخول حصة جديدة:</b><br><br>هذه هي <b>المرة الأولى</b> التي يتم فيها إدخال الحصة "${lot}" (وإن كانت مدرجة في العقد).<br><br>يرجى <b>وضع هذه المنصة على حدة للمعاينة</b> كنموذج استهلالي لهذه الحصة.<br><br>هل تريد المتابعة وتسجيلها؟`;
+        msg = `⚠️ <b>تنبيه دخول حصة جديدة:</b><br><br>هذه هي <b>المرة الأولى</b> التي يتم فيها إدخال الحصة "${escapeHtml(lot)}" (وإن كانت مدرجة في العقد).<br><br>يرجى <b>وضع هذه المنصة على حدة للمعاينة</b> كنموذج استهلالي لهذه الحصة.<br><br>هل تريد المتابعة وتسجيلها؟`;
       }
 
       askConfirmation(() => {
@@ -3199,8 +3203,8 @@ function proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm) {
   });
 
   const operationType = (currentMode === 'receiving') ? "استلام وإرجاع" : "تسليم ومعاينة";
-  addLog(`تم ${operationType} لـ ${numPallets} منصات و ${numBags} أكياس للحصة ${lot} (شاحنة ${truck})`);
-  showToast(`✅ تم بنجاح تسجيل العملية للحصة ${lot} وإعادة الحساب!`);
+  addLog(`تم ${operationType} لـ ${numPallets} منصات و ${numBags} أكياس للحصة ${escapeHtml(lot)} (شاحنة ${escapeHtml(truck)})`);
+  showToast(`✅ تم بنجاح تسجيل العملية للحصة ${escapeHtml(lot)} وإعادة الحساب!`);
   
   
   // Clear quick inputs
@@ -3332,7 +3336,7 @@ function renderShipmentEntriesTable() {
         });
       });
       const lotTotal = Math.max(0, lotRec - lotDel);
-      lotSearchTotalDiv.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> إجمالي رصيد الحصة "${query}" في هذا الملف هو: <b>${lotTotal.toFixed(3)} طن</b>`;
+      lotSearchTotalDiv.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> إجمالي رصيد الحصة "${escapeHtml(query)}" في هذا الملف هو: <b>${lotTotal.toFixed(3)} طن</b>`;
       lotSearchTotalDiv.style.display = 'block';
     }
   } else if (lotSearchTotalDiv) {
@@ -3357,7 +3361,7 @@ function renderShipmentEntriesTable() {
     const row = document.createElement('tr');
     row.innerHTML = `
       <td>${timeStr}</td>
-      <td><b>${e.lot}</b></td>
+      <td><b>${escapeHtml(e.lot)}</b></td>
       <td>${e.truck || '—'}</td>
       <td>${e.bags ? (e.bags + ' كيس سائب') : '1 منصة'}</td>
       <td class="col-pf-individual" style="display:${isIndividual ? 'table-cell' : 'none'};">
@@ -3453,12 +3457,12 @@ function renderLotsSummaryLog() {
 
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td><b>${lot}</b></td>
+      <td><b>${escapeHtml(lot)}</b></td>
       <td>${item.pallets} منّصة ${item.looseBags > 0 ? '+ ' + item.looseBags + ' كيس' : ''}</td>
       <td><span style="color:var(--fb-red);">${tornCount} كيس (${item.pf} PF / ${item.pm} PM)</span></td>
       <td><b>${formatTons(netWeight)} طن</b></td>
       <td>
-        <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="openEditLotModal('${lot}', ${item.pallets}, ${item.looseBags}, ${item.pf}, ${item.pm})">
+        <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="openEditLotModal('${escapeHtml(lot)}', ${item.pallets}, ${item.looseBags}, ${item.pf}, ${item.pm})">
           <i class="fa-solid fa-pencil"></i> تعديل
         </button>
       </td>
@@ -3532,7 +3536,7 @@ function closeEditLotModal(save) {
     // Note: To be absolutely safe and prevent breaking `ts` history, complex count changes 
     // should ideally be done by deleting/adding individual rows. For lot renaming, we just did it above.
 
-    addLog(`تم تعديل الحصة ${currentEditingLot} وتصحيح اسمها إلى ${newLotNumber}.`);
+    addLog(`تم تعديل الحصة ${escapeHtml(currentEditingLot)} وتصحيح اسمها إلى ${escapeHtml(newLotNumber)}.`);
     showToast("✅ تم تعديل اسم الحصة بنجاح!");
     renderAll();
   }
@@ -3562,6 +3566,12 @@ function createNewFile() {
     showToast("⚠️ الرجاء ملء رقم الملف!");
     return;
   }
+
+  if(bagsPerPallet <= 0 || bagWeight <= 0 || contractedQty < 0) {
+    showToast("⚠️ خطأ: يجب أن تكون الأوزان وعدد الأكياس أكبر من الصفر ولا تقبل قيماً سالبة!");
+    return;
+  }
+
 
   const rawLots = document.getElementById('nfLotsNumbers').value.trim();
   const expectedLots = rawLots ? rawLots.split(',').map(s => s.trim()).filter(Boolean) : [];
@@ -3653,12 +3663,12 @@ function renderFilesList() {
 
     card.innerHTML = `
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-        <span style="font-weight:bold; font-size:15px; color:var(--fb-blue);"><i class="fa-solid fa-file-invoice"></i> ملف: ${f.fileNumber}</span>
+        <span style="font-weight:bold; font-size:15px; color:var(--fb-blue);"><i class="fa-solid fa-file-invoice"></i> ملف: ${escapeHtml(f.fileNumber)}</span>
         <span class="chip" style="background-color:rgba(47, 143, 212, 0.1); color:var(--fb-blue);">${f.powderType} دسم</span>
       </div>
       <div style="font-size:12px; opacity:0.8; line-height:1.6; margin-bottom: 8px;">
-        <div><b>المورد:</b> ${f.supplier}</div>
-        <div><b>رقم العقد:</b> ${f.contractNumber} (${f.contractDate})</div>
+        <div><b>المورد:</b> ${escapeHtml(f.supplier)}</div>
+        <div><b>رقم العقد:</b> ${escapeHtml(f.contractNumber)} (${f.contractDate})</div>
         <div><b>الكمية المتعاقد عليها:</b> ${formatTons(f.contractedQty)} طن</div>
       </div>
       <div style="border-top: 1px dashed var(--border-current); padding-top: 8px;">
@@ -3739,6 +3749,13 @@ function renderStockOverview() {
     let rec = 0;
     (f.receiving.entries || []).forEach(e => {
       rec += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
+      
+      // Deduct globally if setting is true
+      if (deductTornBagsChecked) {
+        const singleBagW = (parseFloat(e.tornBagWeight) || parseFloat(f.bagWeight) || 25) / 1000;
+        const entryTornW = ((parseFloat(e.pf)||0) + (parseFloat(e.pm)||0)) * singleBagW;
+        rec -= entryTornW;
+      }
     });
 
     let del = 0;
@@ -3768,7 +3785,7 @@ function renderStockOverview() {
     `;
     cardRow.innerHTML = `
       <div>
-        <b style="color:var(--fb-blue);">${item.warehouse}</b> · بودرة دسم ${item.type}
+        <b style="color:var(--fb-blue);">${escapeHtml(item.warehouse)}</b> · بودرة دسم ${item.type}
         <div style="font-size:11px; opacity:0.7;">مسجل في (${item.fileCount}) ملفات مفعلة</div>
       </div>
       <div style="text-align:left;">
@@ -3780,7 +3797,7 @@ function renderStockOverview() {
     // Deep grid details
     const row = document.createElement('tr');
     row.innerHTML = `
-      <td><b>${item.warehouse}</b></td>
+      <td><b>${escapeHtml(item.warehouse)}</b></td>
       <td>${item.type}</td>
       <td>${item.fileCount}</td>
       <td>${formatTons(item.received)}</td>
@@ -3817,7 +3834,7 @@ function renderStockOverview() {
 
       const row = document.createElement('tr');
       row.innerHTML = `
-        <td><b>${f.fileNumber}</b></td>
+        <td><b>${escapeHtml(f.fileNumber)}</b></td>
         <td>${f.warehouse || 'سعيدة 1'}</td>
         <td>${f.powderType} دسم</td>
         <td>
@@ -3857,8 +3874,8 @@ function renderStockOverview() {
 
       const clientRow = document.createElement('tr');
       clientRow.innerHTML = `
-        <td><b>${d.customerName}</b></td>
-        <td><span dir="ltr" style="direction: ltr; display: inline-block;">${d.certNumber}</span> (${d.certDate || '—'})</td>
+        <td><b>${escapeHtml(d.customerName)}</b></td>
+        <td><span dir="ltr" style="direction: ltr; display: inline-block;">${escapeHtml(d.certNumber)}</span> (${d.certDate || '—'})</td>
         <td>${formatTons(d.targetTons)}</td>
         <td>${formatTons(deliveredWeight)}</td>
         <td style="color:var(--fb-amber); font-weight:bold;">${formatTons(remainingBalance)} طن</td>
@@ -3924,7 +3941,7 @@ function startNewDelivery() {
     localStorage.setItem(LAST_FILE_KEY, selectedFileId);
     currentDeliveryId = delivery.id;
     
-    addLog(`تم بدء عملية تسليم يدوية جديدة للزبون: ${customerName} بمقدار ${targetTons} طن من الملف ${file.fileNumber}.`);
+    addLog(`تم بدء عملية تسليم يدوية جديدة للزبون: ${escapeHtml(customerName)} بمقدار ${targetTons} طن من الملف ${file.fileNumber}.`);
     showToast("✅ تم إنشاء وتفعيل خطة التسليم للزبون!");
     
     document.getElementById('deliveryCustomerInput').value = '';
@@ -3935,7 +3952,7 @@ function startNewDelivery() {
 
     setOperationMode('delivery', true);
     switchView('home');
-  }, `⚠️ <b>تأكيد التوجيه اليدوي (Affectation Manuelle):</b><br><br>هل أنت متأكد من فتح حساب جديد للزبون <b>"${customerName}"</b> بوزن <b>(${targetTons} طن)</b> وربطه ليخصم سلعته من الملف / الباخرة <b>"${file.fileNumber}"</b> (مستودع ${file.warehouse || 'سعيدة 1'})؟`);
+  }, `⚠️ <b>تأكيد التوجيه اليدوي (Affectation Manuelle):</b><br><br>هل أنت متأكد من فتح حساب جديد للزبون <b>"${escapeHtml(customerName)}"</b> بوزن <b>(${targetTons} طن)</b> وربطه ليخصم سلعته من الملف / الباخرة <b>"${file.fileNumber}"</b> (مستودع ${file.warehouse || 'سعيدة 1'})؟`);
 }
 
 function renderCustomerBalances() {
@@ -4096,7 +4113,7 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
 
     return `
       <tr>
-        <td style="font-weight:bold; font-size:14px;">${lot}</td>
+        <td style="font-weight:bold; font-size:14px;">${escapeHtml(lot)}</td>
         <td>${countStr}${tornInfoStr}</td>
         <td>${formatTons(weight)}</td>
       </tr>
@@ -4148,8 +4165,8 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
         <div class="pi-customer-box" style="margin-top: 10px;">
           <div style="margin-bottom: 5px; font-size: 14px; color: #2F8FD4;"><b>معلومات زبون التخصيص (Client et Affectation)</b></div>
           <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-            <div>اسم العميل الكامل: <b>${activeDelivery.customerName}</b></div>
-            <div>رقم شهادة التخصيص: <b dir="ltr" style="direction: ltr; display: inline-block;">${activeDelivery.certNumber}</b></div>
+            <div>اسم العميل الكامل: <b>${escapeHtml(activeDelivery.customerName)}</b></div>
+            <div>رقم شهادة التخصيص: <b dir="ltr" style="direction: ltr; display: inline-block;">${escapeHtml(activeDelivery.certNumber)}</b></div>
             <div>تاريخ الشهادة: <b>${activeDelivery.certDate || '—'}</b></div>
             <div>الكمية القصوى المعتمدة للشهادة: <b style="color:var(--fb-red);">${activeDelivery.targetTons} طن</b></div>
             <div>الكميات السابقة المسلمة: <b>${formatTons(prevDeliveredWeight)} طن</b></div>
@@ -4688,8 +4705,14 @@ function closeEditFileModal(save) {
     if (!file) return;
     
     // Check if the user is changing critical math variables while entries exist
-    const newBagsPerPallet = parseInt(document.getElementById('efBagsPerPallet').value) || 56;
-    const newBagWeight = parseFloat(document.getElementById('efBagWeight').value) || 25;
+    const newBagsPerPallet = parseInt(document.getElementById(efBagsPerPallet).value) || 56;
+    const newBagWeight = parseFloat(document.getElementById(efBagWeight).value) || 25;
+    const newContractedQty = parseFloat(document.getElementById(efContractedQty).value) || 0;
+    
+    if(newBagsPerPallet <= 0 || newBagWeight <= 0 || newContractedQty < 0) {
+      showToast("⚠️ خطأ: لا يمكن حفظ قيم سالبة أو صفرية للأوزان والحصص!");
+      return;
+    }
     
     const hasEntries = (file.receiving && file.receiving.entries && file.receiving.entries.length > 0) || 
                        (file.deliveries && file.deliveries.some(d => d.entries && d.entries.length > 0));
@@ -4789,10 +4812,10 @@ function deleteCustomerConfirm(fileId, deliveryId) {
     if (currentDeliveryId === deliveryId) {
       currentDeliveryId = '';
     }
-    addLog(`🗑️ تم حذف كواطة الزبون: ${d.customerName}`);
+    addLog(`🗑️ تم حذف كواطة الزبون: ${escapeHtml(d.customerName)}`);
     showToast("🗑️ تم حذف كواطة الزبون بنجاح!");
     renderAll();
-  }, `⚠️ هل أنت متأكد تماماً من رغبتك في حذف شهادة تخصيص الزبون "${d.customerName}" (رقم: ${d.certNumber}) وكافة سجلات سحوباته نهائياً من الذاكرة المحلية؟ هذا الإجراء لا يمكن الرجوع عنه!`);
+  }, `⚠️ هل أنت متأكد تماماً من رغبتك في حذف شهادة تخصيص الزبون "${escapeHtml(d.customerName)}" (رقم: ${escapeHtml(d.certNumber)}) وكافة سجلات سحوباته نهائياً من الذاكرة المحلية؟ هذا الإجراء لا يمكن الرجوع عنه!`);
 }
 
 // --- BACKUP, RESTORE AND SETTINGS TOOLS ---
@@ -4835,7 +4858,8 @@ function restoreBackup(event) {
 
 function adjustReceiptNumbering() {
   const code = prompt("🔑 يرجى إدخال الرمز السري للإدارة لتعديل ترقيم السندات والوصولات:");
-  if (code !== "ONIL2026") {
+  // Simple check using encoded string to prevent casual view-source peeping
+  if (btoa(code) !== "T05JTDIwMjY=") {
     showAlertModal("🛑 عذراً، الرمز السري الذي أدخلته غير صحيح! لا يمكن تعديل الترقيم دون صلاحيات.");
     return;
   }
@@ -5231,5 +5255,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a265976fb8ad09ad',t:'MTc4NTkzMDcwMw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</body>
 </html>
