@@ -1255,6 +1255,44 @@ tr:hover {
           <input type="text" id="deliveryCustomer" readonly style="font-weight:bold;">
         </div>
       </div>
+    <!-- NEW: إدارة فحوصات المخبر - إخراج وإدخال - زر مستقل -->
+    <div id="labTestsControls" class="card" style="border:2px solid #8e44ad; background:rgba(142,68,173,0.04); margin-bottom:12px;">
+      <h2><i class="fa-solid fa-flask" style="color:#8e44ad;"></i> 🧪 إدارة فحوصات المخبر (إخراج/إدخال) - زر مستقل</h2>
+      <div style="font-size:11px; opacity:0.8; margin-bottom:10px; background:rgba(142,68,173,0.08); padding:6px; border-radius:4px; border-right:3px solid #8e44ad;">
+        بديل لعملية التسليم العادي: هنا تسجل سحب عينات للمخبر وإرجاعها، ويتم خصمها/إضافتها تلقائياً من الكمية المتوفرة الفعلية (مثال: 500,000 → 499,990 بعد إخراج 10 أكياس ×1كغ).
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>نوع العملية المخبرية</label>
+          <select id="labTypeSelect" style="border-color:#8e44ad; font-weight:bold;">
+            <option value="out">🔴 إخراج عينة للمخبر (يخصم من المتاح)</option>
+            <option value="in">🟢 إدخال إرجاع من المخبر (يضيف للمتاح)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>رقم الحصة المفحوصة</label>
+          <input type="text" id="labLotNumber" placeholder="رقم الحصة">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
+          <label>عدد المنصات / الأكياس السائبة للمخبر</label>
+          <div style="display:flex; gap:6px;">
+            <input type="number" id="labPalletsCount" min="0" value="0" placeholder="منصات" style="flex:1;">
+            <input type="number" id="labBagsCount" min="0" value="1" placeholder="أكياس سائبة" style="flex:1;">
+          </div>
+        </div>
+        <div class="field">
+          <label>السبب / رقم تقرير المخبر</label>
+          <input type="text" id="labReason" placeholder="مثال: تحليل رطوبة - تقرير رقم 123">
+        </div>
+      </div>
+      <button class="btn" style="width:100%; background:#8e44ad; color:white; padding:12px; font-size:14px; font-weight:800;" onclick="addLabTestEntry()">
+        <i class="fa-solid fa-flask-vial"></i> تسجيل عملية المخبر الآن
+      </button>
+      <div id="labEntriesList" style="margin-top:12px;"></div>
+    </div>
+
 
       <button class="btn btn-primary" style="width: 100%; padding: 12px; font-size: 15px;" onclick="addShipmentBatch()">
         <i class="fa-solid fa-save"></i> حفظ وتسجيل العملية
@@ -2393,6 +2431,29 @@ function getEntryTornInfo(entry, file){
   return {pfW, pmW};
 }
 
+// --- حساب مخزون الملف الحقيقي شامل فحوصات المخبر (إخراج/إدخال) ---
+function getFileRealStocks(file){
+  if(!file) return {rec:0,torn:0,labOut:0,labIn:0,del:0,available:0};
+  const pw = palletWeight(file);
+  let rec=0,torn=0,labOut=0,labIn=0,del=0;
+  (file.receiving?.entries || []).forEach(e=>{
+    rec += e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+    if(deductTornBagsChecked) torn += calcTornTons(e, file);
+  });
+  (file.deliveries||[]).forEach(d=>{
+    (d.entries||[]).forEach(e=>{
+      del += e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+    });
+  });
+  const labEntries = file.labTests?.entries || file.labEntries || [];
+  labEntries.forEach(e=>{
+    const w = e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+    if(e.type==='out'){ labOut+=w; } else { labIn+=w; }
+  });
+  const available = Math.max(0, rec - torn - labOut + labIn - del);
+  return {rec,torn,labOut,labIn,del,available};
+}
+
 
 function getLotsTally(entries, file) {
   const tally = {};
@@ -2598,8 +2659,9 @@ function renderAll() {
   const strip = document.getElementById('activeFileStrip');
   if(file) {
     strip.style.display = 'flex';
+    const stocks = getFileRealStocks(file);
     document.getElementById('activeFileTitle').textContent = `📁 ملف نشط: ${file.fileNumber} (عقد ${file.contractNumber || '—'})`;
-    document.getElementById('activeFilePowder').textContent = `بودرة دسم ${file.powderType}`;
+    document.getElementById('activeFilePowder').textContent = `بودرة دسم ${file.powderType} | المتاح فعلياً: ${formatTons(stocks.available)} طن (المستلم ${formatTons(stocks.rec)} - ممزق ${formatTons(stocks.torn)} - مخبر إخراج ${formatTons(stocks.labOut)} + إرجاع ${formatTons(stocks.labIn)} - مسلم ${formatTons(stocks.del)})`;
   } else {
     strip.style.display = 'none';
   }
@@ -2615,8 +2677,9 @@ function renderAll() {
     renderLotsSummaryLog();
     updateActiveQuotaSelectOptions();
     renderUnclosedDeliveries(); // Render list of unclosed deliveries for resuming
-    renderFEFORecommendation(); // Smart FEFO Lot recommendation based on expiry dates
-    calculateTonsToPallets();    // Update the reverse converter with active file parameters
+    renderFEFORecommendation();
+    renderLabEntriesList();
+    calculateTonsToPallets();
   } else if(activeView === 'shipments') {
     renderFilesList();
   } else if(activeView === 'stock') {
@@ -2677,21 +2740,10 @@ function renderFEFORecommendation() {
   const list = loadFiles();
   if(list.length === 0) return;
 
-  // Filter files that have available stock > 0
+  // FIXED: يعرض الكمية المتوفرة الفعلية بعد خصم الممزق والمخبر وليس المتعاقد عليها
   const eligibleFiles = list.map(f => {
-    const pw = palletWeight(f);
-    let recTons = 0;
-    (f.receiving.entries || []).forEach(e => {
-      recTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
-    });
-    let delTons = 0;
-    (f.deliveries || []).forEach(d => {
-      (d.entries || []).forEach(e => {
-        delTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
-      });
-    });
-    const remainingStock = Math.max(0, recTons - delTons);
-    return { file: f, remainingStock, expiry: f.expiryDate };
+    const stocks = getFileRealStocks(f);
+    return { file: f, remainingStock: stocks.available, recTons: stocks.rec, tornDeduction: stocks.torn, labOut: stocks.labOut, labIn: stocks.labIn, delTons: stocks.del, expiry: f.expiryDate };
   }).filter(item => item.remainingStock > 0.001 && item.expiry && item.expiry !== '—');
 
   if(eligibleFiles.length === 0) return;
@@ -2717,15 +2769,15 @@ function renderFEFORecommendation() {
     gap: 10px;
     box-shadow: 0 2px 6px rgba(26, 115, 232, 0.15);
   `;
+  const f = nextToExpire.file;
   card.innerHTML = `
     <i class="fa-solid fa-brain" style="color: var(--fb-blue); font-size: 18px; flex-shrink:0;"></i>
     <div style="flex:1; line-height:1.5;">
       <b>💡 توصية الصرف الذكي (FEFO):</b> نقترح صرف البودرة حالياً من الملف النشط 
       <a href="#" onclick="selectActiveFile('${nextToExpire.file.id}'); return false;" style="color: var(--fb-blue); font-weight: 800; text-decoration: underline;">
-        ${nextToExpire.file.fileNumber}
+        ${f.fileNumber}
       </a> 
-      الموجود بمستودع (<b>${nextToExpire.file.warehouse || 'سعيدة 1'}</b>) لوجود كمية 
-      <b>${formatTons(nextToExpire.remainingStock)} طن</b> متبقية فيه، ولأن صلاحيته هي الأقرب للانتهاء: 
+      الموجود بمستودع (<b>${f.warehouse || 'سعيدة 1'}</b>) لوجود كمية <b style="color:var(--fb-green);">${formatTons(nextToExpire.remainingStock)} طن متاحة فعلاً</b> (بعد خصم ممزق ${formatTons(nextToExpire.tornDeduction||0)} طن ومخبر إخراج ${formatTons(nextToExpire.labOut||0)} طن + إرجاع ${formatTons(nextToExpire.labIn||0)} طن ومسلم ${formatTons(nextToExpire.delTons||0)} طن) من أصل ${formatTons(f.contractedQty||0)} طن متعاقد عليها، ولأن صلاحيته هي الأقرب للانتهاء: 
       <span style="color: var(--fb-red); font-weight: bold;">${nextToExpire.expiry}</span> لتدوير المخزون بكفاءة وتفادي التلف.
     </div>
   `;
@@ -2798,6 +2850,102 @@ function calculateTonsToPallets() {
     }
   }
 }
+
+
+// --- NEW: Lab Tests Management Functions ---
+function addLabTestEntry(){
+  const file = getFile(currentFileId);
+  if(!file){
+    showToast("⚠️ الرجاء تحديد ملف نشط أولاً!");
+    return;
+  }
+  const type = document.getElementById('labTypeSelect').value; // out / in
+  const lot = document.getElementById('labLotNumber').value.trim() || "فحص مخبر";
+  const pallets = parseInt(document.getElementById('labPalletsCount').value) || 0;
+  const bags = parseInt(document.getElementById('labBagsCount').value) || 0;
+  const reason = document.getElementById('labReason').value.trim() || "فحص مخبر";
+
+  if(pallets===0 && bags===0){
+    showToast("⚠️ الرجاء تحديد عدد المنصات أو الأكياس للمخبر!");
+    return;
+  }
+
+  // Validation: available stock check for out operation
+  if(type==='out'){
+    const stocks = getFileRealStocks(file);
+    const pw = palletWeight(file);
+    const needed = pallets * pw + bags * (parseFloat(file.bagWeight)/1000);
+    if(stocks.available < needed - 0.001){
+      showAlertModal(`🛑 <b>عجز في المخزون المتاح:</b><br>الكمية المتاحة فعلاً هي ${formatTons(stocks.available)} طن فقط، بينما تريد إخراج ${formatTons(needed)} طن للمخبر.<br><br>المتاح = المستلم ${formatTons(stocks.rec)} - ممزق ${formatTons(stocks.torn)} - مخبر إخراج ${formatTons(stocks.labOut)} + إرجاع ${formatTons(stocks.labIn)} - مسلم ${formatTons(stocks.del)}`);
+      return;
+    }
+  }
+
+  const entriesToAdd = [];
+  const baseTs = Date.now();
+  for(let i=0;i<pallets;i++){
+    entriesToAdd.push({lot, ts: baseTs+i, type, reason, truck: "مخبر"});
+  }
+  if(bags>0){
+    entriesToAdd.push({lot, ts: baseTs+pallets+1, bags, type, reason, truck: "مخبر"});
+  }
+
+  updateFile(currentFileId, f=>{
+    f.labTests = f.labTests || {entries:[]};
+    f.labTests.entries.push(...entriesToAdd);
+  });
+
+  addLog(`${type==='out'?'🔴 إخراج':'🟢 إدخال'} فحص مخبر للحصة ${escapeHtml(lot)} - ${pallets} منصة + ${bags} كيس - السبب: ${escapeHtml(reason)}`);
+  showToast(`✅ تم تسجيل ${type==='out'?'إخراج':'إدخال'} فحص المخبر بنجاح! المتاح الآن: ${formatTons(getFileRealStocks(getFile(currentFileId)).available)} طن`);
+
+  document.getElementById('labLotNumber').value='';
+  document.getElementById('labPalletsCount').value='0';
+  document.getElementById('labBagsCount').value='1';
+  document.getElementById('labReason').value='';
+
+  renderAll();
+}
+
+function renderLabEntriesList(){
+  const file = getFile(currentFileId);
+  const container = document.getElementById('labEntriesList');
+  if(!container) return;
+  container.innerHTML='';
+  if(!file) return;
+  const entries = (file.labTests?.entries || []).slice().reverse();
+  if(entries.length===0){
+    container.innerHTML='<div style="font-size:11px; opacity:0.6; text-align:center; padding:8px;">لا توجد عمليات مخبر مسجلة بعد</div>';
+    return;
+  }
+  const pw = palletWeight(file);
+  let html = '<div style="font-size:12px; font-weight:bold; margin-bottom:6px;">سجل فحوصات المخبر:</div>';
+  html += '<div style="max-height:200px; overflow-y:auto; border:1px solid var(--border-current); border-radius:6px;">';
+  entries.forEach(e=>{
+    const w = e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+    const timeStr = new Date(e.ts).toLocaleString('ar-DZ', {hour:'2-digit', minute:'2-digit'});
+    const typeBadge = e.type==='out' ? '<span style="background:#e74c3c; color:white; padding:2px 6px; border-radius:10px; font-size:10px;">إخراج</span>' : '<span style="background:#27ae60; color:white; padding:2px 6px; border-radius:10px; font-size:10px;">إرجاع</span>';
+    html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #eee; font-size:11px;">
+      <span>${timeStr} | ${typeBadge} | حصة <b>${escapeHtml(e.lot||'—')}</b> | ${e.bags ? e.bags+' كيس' : '1 منصة'} (${formatTons(w)} طن) | ${escapeHtml(e.reason||'')}</span>
+      <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteLabEntry(${e.ts})"><i class="fa-solid fa-trash"></i></button>
+    </div>`;
+  });
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+function deleteLabEntry(ts){
+  askConfirmation(()=>{
+    updateFile(currentFileId, f=>{
+      if(f.labTests?.entries){
+        const idx = f.labTests.entries.findIndex(e=>e.ts===ts);
+        if(idx!==-1) f.labTests.entries.splice(idx,1);
+      }
+    });
+    showToast("🗑️ تم حذف عملية المخبر");
+    renderAll();
+  }, "هل تريد حذف عملية المخبر هذه؟ سيؤثر على الكمية المتاحة الفعلية.");
+}
+
 
 function resumeUnclosedDelivery(deliveryId) {
   currentDeliveryId = deliveryId;
@@ -3018,10 +3166,9 @@ function renderSuggestedChips() {
       chip.className = 'chip';
       
       if (currentMode === 'delivery' && item.available !== null) {
-        // Show real-time available stock for each lot to match the field precisely
-        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${item.lot} <span style="font-size:11px; font-weight:bold; color:var(--fb-red); margin-right:5px; background: rgba(255,0,0,0.1); padding: 2px 5px; border-radius: 4px;">(${formatTons(item.available)} طن متاح)</span>`;
+        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${escapeHtml(item.lot)} <span style="font-size:11px; font-weight:bold; color:var(--fb-red); margin-right:5px; background: rgba(255,0,0,0.1); padding: 2px 5px; border-radius: 4px;">(${formatTons(item.available)} طن متاح)</span>`;
       } else {
-        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${item.lot}`;
+        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${escapeHtml(item.lot)}`;
       }
       
       chip.onclick = () => {
@@ -3333,16 +3480,16 @@ function archiveCurrentBatch() {
     let seqNum = parseInt(localStorage.getItem(seqKey)) || 1;
     const formattedSeq = String(seqNum).padStart(3, '0');
 
-    // Save checkpoint to database/localStorage
+    // Save checkpoint with bagWeight snapshot for PF<25kg consistency
     updateFile(currentFileId, f => {
       if(currentMode === 'receiving') {
         f.receivingCheckpoints = f.receivingCheckpoints || [];
-        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal });
+        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, bagWeight: f.bagWeight, bagsPerPallet: f.bagsPerPallet, deductTorn: deductTornBagsChecked });
       } else {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
         if(d) {
           d.checkpoints = d.checkpoints || [];
-          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal });
+          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, bagWeight: f.bagWeight, bagsPerPallet: f.bagsPerPallet });
         }
       }
     });
@@ -3662,7 +3809,8 @@ function createNewFile() {
     productionDate: document.getElementById('nfProductionDate').value || '—',
     expiryDate: document.getElementById('nfExpiryDate').value || '—',
     receiving: { entries: [] },
-    deliveries: []
+    deliveries: [],
+    labTests: { entries: [] }
   };
 
   const list = loadFiles();
@@ -3718,6 +3866,15 @@ function renderFilesList() {
         if(!e.lot) return;
         if(lotMap[e.lot] !== undefined) lotMap[e.lot] -= entryWeight(e, f);
       });
+    });
+    // Subtract lab out and add lab in per lot
+    const labEntries = f.labTests?.entries || f.labEntries || [];
+    labEntries.forEach(e=>{
+      if(!e.lot) return;
+      if(lotMap[e.lot]===undefined) lotMap[e.lot]=0;
+      const w = entryWeight(e,f);
+      if(e.type==='out') lotMap[e.lot]-=w;
+      else lotMap[e.lot]+=w;
     });
     let lotsHtml = Object.keys(lotMap)
       .filter(l => lotMap[l] > 0.001)
@@ -3832,7 +3989,7 @@ function renderStockOverview() {
 
     totals[key].received += rec;
     totals[key].delivered += del;
-    totals[key].available += Math.max(0, rec - del);
+    totals[key].available += getFileRealStocks(f).available;
     totals[key].fileCount += 1;
   });
 
@@ -3877,22 +4034,13 @@ function renderStockOverview() {
   if (indFilesBody) {
     indFilesBody.innerHTML = '';
     list.forEach(f => {
-      const pw = palletWeight(f);
-      let recTons = 0;
-      let totalTornDeduction = 0;
-      (f.receiving.entries || []).forEach(e => {
-        recTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
-        totalTornDeduction += calcTornTons(e, f);
-      });
-      recTons = Math.max(0, recTons - totalTornDeduction);
-
-      let delTons = 0;
-      (f.deliveries || []).forEach(d => {
-        (d.entries || []).forEach(e => {
-          delTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
-        });
-      });
-      const remainingTons = Math.max(0, recTons - delTons);
+      const stocks = getFileRealStocks(f);
+      const recTons = stocks.rec;
+      const totalTornDeduction = stocks.torn;
+      const delTons = stocks.del;
+      const labOut = stocks.labOut;
+      const labIn = stocks.labIn;
+      const remainingTons = stocks.available;
 
       const row = document.createElement('tr');
       row.innerHTML = `
@@ -5334,35 +5482,6 @@ function exportAllToExcelActual() {
 }
 
 // --- FORCE APP UPDATE & CLEAR CACHE ---
-function forceAppUpdate() {
-  if (confirm("🔄 هل تريد تحديث التطبيق ومسح التخزين المؤقت وحل مشكلة عدم ظهور التعديلات الجديدة؟ سيقوم هذا بتحديث كافة الشاشات والوصولات فوراً دون حذف ملفاتك.")) {
-    showToast("⏳ جاري تحديث النظام ومسح الكاش...");
-    
-    // 1. Unregister all service workers
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function(registrations) {
-        for(let registration of registrations) {
-          registration.unregister();
-        }
-      });
-    }
-
-    // 2. Clear Cache Storage completely
-    if ('caches' in window) {
-      caches.keys().then(function(names) {
-        for (let name of names) {
-          caches.delete(name);
-        }
-      });
-    }
-
-    // 3. Force hard reload using dynamic query parameter to bypass ANY cache
-    setTimeout(() => {
-      window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now();
-    }, 1000);
-  }
-}
-
 // --- PWA NATIVE INSTALL CONTROL ---
 let deferredPrompt;
 window.addEventListener('beforeinstallprompt', (e) => {
@@ -5402,5 +5521,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27696d2a971294d',t:'MTc4NjEwODkzNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a276c1d5186a09ad',t:'MTc4NjExMDY5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
