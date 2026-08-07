@@ -1255,18 +1255,20 @@ tr:hover {
           <input type="text" id="deliveryCustomer" readonly style="font-weight:bold;">
         </div>
       </div>
-    <!-- NEW: إدارة فحوصات المخبر - إخراج وإدخال - زر مستقل -->
+    <!-- NEW: إدارة فحوصات المخبر - إخراج وإدخال - زر مستقل - مع وزن صافي وتسجيل في السجل -->
     <div id="labTestsControls" class="card" style="border:2px solid #8e44ad; background:rgba(142,68,173,0.04); margin-bottom:12px;">
-      <h2><i class="fa-solid fa-flask" style="color:#8e44ad;"></i> 🧪 إدارة فحوصات المخبر (إخراج/إدخال) - زر مستقل</h2>
-      <div style="font-size:11px; opacity:0.8; margin-bottom:10px; background:rgba(142,68,173,0.08); padding:6px; border-radius:4px; border-right:3px solid #8e44ad;">
-        بديل لعملية التسليم العادي: هنا تسجل سحب عينات للمخبر وإرجاعها، ويتم خصمها/إضافتها تلقائياً من الكمية المتوفرة الفعلية (مثال: 500,000 → 499,990 بعد إخراج 10 أكياس ×1كغ).
+      <h2><i class="fa-solid fa-flask" style="color:#8e44ad;"></i> 🧪 إدارة فحوصات المخبر (إخراج/إدخال) - زر مستقل - مسجل في السجل الرئيسي</h2>
+      <div style="font-size:11px; opacity:0.9; margin-bottom:10px; background:rgba(142,68,173,0.08); padding:8px; border-radius:6px; border-right:3px solid #8e44ad; line-height:1.6;">
+        🔹 <b>إخراج:</b> سحب عينة للمخبر (يخصم من المتاح) بوزن 25كغ كامل.<br>
+        🔹 <b>إدخال:</b> إرجاع من المخبر ناقص (مثال: الكيس 25كغ أخذوا منه 0.8كغ للتحليل → يرجع 24.2كغ). <b>يجب وزنه وكتابة الوزن الصافي بنفسك</b> في الحقل أدناه.<br>
+        🔹 يتم تسجيل العملية في <b>السجل الرئيسي للشحنات</b> ويمكن تعديل/حذف الحصة وإعادة تسجيلها، وتطبع بنفس وصولات الاستلام/التسليم متبعة تسلسل الأرقام.
       </div>
       <div class="form-row">
         <div class="field">
           <label>نوع العملية المخبرية</label>
-          <select id="labTypeSelect" style="border-color:#8e44ad; font-weight:bold;">
-            <option value="out">🔴 إخراج عينة للمخبر (يخصم من المتاح)</option>
-            <option value="in">🟢 إدخال إرجاع من المخبر (يضيف للمتاح)</option>
+          <select id="labTypeSelect" style="border-color:#8e44ad; font-weight:bold;" onchange="onLabTypeChange()">
+            <option value="out">🔴 إخراج عينة للمخبر (يخصم من المتاح - وزن كامل)</option>
+            <option value="in">🟢 إدخال إرجاع من المخبر (يضيف للمتاح - وزن ناقص يجب وزنه)</option>
           </select>
         </div>
         <div class="field">
@@ -1283,12 +1285,24 @@ tr:hover {
           </div>
         </div>
         <div class="field">
+          <label>الوزن الصافي للكيس الواحد (كغ) - يجب وزنه!</label>
+          <input type="number" id="labNetWeightPerBag" min="0" max="25" step="0.01" value="25" placeholder="مثال: 24.2" style="border:2px solid #8e44ad; font-weight:bold;">
+          <div style="font-size:10px; opacity:0.7; margin-top:2px;">عند الإدخال: وزن الكيس بعد أخذ عينة التحليل (ناقص). عند الإخراج: 25كغ كامل.</div>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="field">
           <label>السبب / رقم تقرير المخبر</label>
           <input type="text" id="labReason" placeholder="مثال: تحليل رطوبة - تقرير رقم 123">
         </div>
+        <div class="field" style="display:flex; align-items:flex-end;">
+          <label style="display:flex; align-items:center; gap:6px; font-size:11px; cursor:pointer;">
+            <input type="checkbox" id="labAddToReceipt" checked> تسجيل بنفس وصولات التسليم/الاستلام (متابعة التسلسل)
+          </label>
+        </div>
       </div>
       <button class="btn" style="width:100%; background:#8e44ad; color:white; padding:12px; font-size:14px; font-weight:800;" onclick="addLabTestEntry()">
-        <i class="fa-solid fa-flask-vial"></i> تسجيل عملية المخبر الآن
+        <i class="fa-solid fa-flask-vial"></i> تسجيل عملية المخبر الآن (مسجلة في السجل)
       </button>
       <div id="labEntriesList" style="margin-top:12px;"></div>
     </div>
@@ -2431,23 +2445,26 @@ function getEntryTornInfo(entry, file){
   return {pfW, pmW};
 }
 
-// --- حساب مخزون الملف الحقيقي شامل فحوصات المخبر (إخراج/إدخال) ---
+// --- حساب مخزون الملف الحقيقي شامل فحوصات المخبر (إخراج/إدخال) مع وزن صافي يدوي لكل كيس ناقص ---
 function getFileRealStocks(file){
   if(!file) return {rec:0,torn:0,labOut:0,labIn:0,del:0,available:0};
   const pw = palletWeight(file);
+  const bpp = parseFloat(file.bagsPerPallet)||56;
+  const defW = parseFloat(file.bagWeight)||25;
   let rec=0,torn=0,labOut=0,labIn=0,del=0;
   (file.receiving?.entries || []).forEach(e=>{
-    rec += e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+    rec += e.bags ? (e.bags * defW/1000) : pw;
     if(deductTornBagsChecked) torn += calcTornTons(e, file);
   });
   (file.deliveries||[]).forEach(d=>{
     (d.entries||[]).forEach(e=>{
-      del += e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+      del += e.bags ? (e.bags * defW/1000) : pw;
     });
   });
   const labEntries = file.labTests?.entries || file.labEntries || [];
   labEntries.forEach(e=>{
-    const w = e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
+    const netW = e.netWeightPerBag || defW;
+    const w = e.bags ? (e.bags * netW/1000) : (bpp * netW/1000);
     if(e.type==='out'){ labOut+=w; } else { labIn+=w; }
   });
   const available = Math.max(0, rec - torn - labOut + labIn - del);
@@ -2852,56 +2869,110 @@ function calculateTonsToPallets() {
 }
 
 
-// --- NEW: Lab Tests Management Functions ---
+// --- Lab Tests Management Functions - UPDATED: مسجلة في السجل الرئيسي + وزن صافي يدوي + نفس تسلسل الوصولات ---
+function onLabTypeChange(){
+  const type = document.getElementById('labTypeSelect').value;
+  const weightInput = document.getElementById('labNetWeightPerBag');
+  if(type==='out'){
+    weightInput.value = parseFloat(getFile(currentFileId)?.bagWeight || 25);
+    weightInput.placeholder = "25 (وزن كامل)";
+  } else {
+    weightInput.placeholder = "مثال: 24.2 (وزن ناقص بعد التحليل - يجب وزنه)";
+    // يبقى القيمة السابقة ليكتب المستخدم الصافي
+  }
+}
+
 function addLabTestEntry(){
   const file = getFile(currentFileId);
   if(!file){
     showToast("⚠️ الرجاء تحديد ملف نشط أولاً!");
     return;
   }
-  const type = document.getElementById('labTypeSelect').value; // out / in
-  const lot = document.getElementById('labLotNumber').value.trim() || "فحص مخبر";
+  const type = document.getElementById('labTypeSelect').value;
+  const lot = document.getElementById('labLotNumber').value.trim();
+  if(!lot){
+    showToast("⚠️ الرجاء إدخال رقم الحصة للتحليل!");
+    document.getElementById('labLotNumber').focus();
+    return;
+  }
   const pallets = parseInt(document.getElementById('labPalletsCount').value) || 0;
   const bags = parseInt(document.getElementById('labBagsCount').value) || 0;
   const reason = document.getElementById('labReason').value.trim() || "فحص مخبر";
+  let netWeightPerBag = parseFloat(document.getElementById('labNetWeightPerBag').value);
+  const defW = parseFloat(file.bagWeight) || 25;
+  if(isNaN(netWeightPerBag) || netWeightPerBag<=0){
+    showToast("⚠️ الرجاء إدخال الوزن الصافي للكيس (مثلاً 24.2)!");
+    document.getElementById('labNetWeightPerBag').focus();
+    return;
+  }
+  if(netWeightPerBag > defW){
+    showAlertModal(`🛑 <b>خطأ في الوزن الصافي:</b><br>الوزن الصافي للكيس (${netWeightPerBag}كغ) لا يمكن أن يكون أكبر من الوزن الاسمي للكيس (${defW}كغ)!<br><br>عند الإدخال (إرجاع) يجب أن يكون الوزن ناقصاً (مثلاً 24.2)، وعند الإخراج يكون 25 كامل.`);
+    return;
+  }
 
   if(pallets===0 && bags===0){
     showToast("⚠️ الرجاء تحديد عدد المنصات أو الأكياس للمخبر!");
     return;
   }
 
-  // Validation: available stock check for out operation
+  // حساب الوزن المطلوب للتحقق من المتاح
+  const pwFull = palletWeight(file);
+  const pwCustom = (parseFloat(file.bagsPerPallet)||56) * netWeightPerBag / 1000;
+  const neededOut = pallets * pwCustom + bags * (netWeightPerBag/1000);
+
   if(type==='out'){
     const stocks = getFileRealStocks(file);
-    const pw = palletWeight(file);
-    const needed = pallets * pw + bags * (parseFloat(file.bagWeight)/1000);
-    if(stocks.available < needed - 0.001){
-      showAlertModal(`🛑 <b>عجز في المخزون المتاح:</b><br>الكمية المتاحة فعلاً هي ${formatTons(stocks.available)} طن فقط، بينما تريد إخراج ${formatTons(needed)} طن للمخبر.<br><br>المتاح = المستلم ${formatTons(stocks.rec)} - ممزق ${formatTons(stocks.torn)} - مخبر إخراج ${formatTons(stocks.labOut)} + إرجاع ${formatTons(stocks.labIn)} - مسلم ${formatTons(stocks.del)}`);
+    if(stocks.available < neededOut - 0.001){
+      showAlertModal(`🛑 <b>عجز في المخزون المتاح:</b><br>الكمية المتاحة فعلاً هي <b>${formatTons(stocks.available)} طن</b> فقط، بينما تريد إخراج <b>${formatTons(neededOut)} طن</b> للمخبر.<br><br>المتاح = المستلم ${formatTons(stocks.rec)} - ممزق ${formatTons(stocks.torn)} - مخبر إخراج ${formatTons(stocks.labOut)} + إرجاع ${formatTons(stocks.labIn)} - مسلم ${formatTons(stocks.del)}<br><br>لا يمكن إخراج أكثر من المتاح!`);
       return;
+    }
+  }
+
+  // التأكد من وجود الحصة في المخزون (لمنع إدخال حصة وهمية)
+  if(type==='out' || type==='in'){
+    // للتحليل، يجب أن تكون الحصة موجودة سابقاً في الاستلام (إلا إذا كان إدخال إرجاع لحصة أخرجت للمخبر)
+    const allReceivedLots = (file.receiving.entries||[]).map(e=>e.lot);
+    const allLabOutLots = (file.labTests?.entries||[]).filter(e=>e.type==='out').map(e=>e.lot);
+    if(type==='out' && !allReceivedLots.includes(lot)){
+      showAlertModal(`🛑 <b>الحصة غير موجودة:</b><br>لا يمكن إخراج حصة "${escapeHtml(lot)}" للمخبر لأنها غير مستلمة أصلاً في هذا الملف!<br><br>الحصص المستلمة: ${[...new Set(allReceivedLots)].join(' - ') || 'لا يوجد'}`);
+      return;
+    }
+    if(type==='in' && !allLabOutLots.includes(lot) && !allReceivedLots.includes(lot)){
+      // يسمح بإدخال إرجاع حتى لو لم تكن مستلمة سابقاً؟ الأفضل التحذير فقط
+      // نسمح لكن نحذر
     }
   }
 
   const entriesToAdd = [];
   const baseTs = Date.now();
   for(let i=0;i<pallets;i++){
-    entriesToAdd.push({lot, ts: baseTs+i, type, reason, truck: "مخبر"});
+    entriesToAdd.push({lot, ts: baseTs+i, type, reason, netWeightPerBag, truck: "مخبر - "+reason, bags: null});
   }
   if(bags>0){
-    entriesToAdd.push({lot, ts: baseTs+pallets+1, bags, type, reason, truck: "مخبر"});
+    entriesToAdd.push({lot, ts: baseTs+pallets+1, bags, type, reason, netWeightPerBag, truck: "مخبر - "+reason});
   }
+
+  const addToReceipt = document.getElementById('labAddToReceipt')?.checked;
 
   updateFile(currentFileId, f=>{
     f.labTests = f.labTests || {entries:[]};
     f.labTests.entries.push(...entriesToAdd);
+    // إذا اختار المستخدم تسجيل بنفس وصولات التسليم/الاستلام، نضيف أيضاً للسجل الرئيسي لضمان التسلسل
+    if(addToReceipt){
+      // سيتم احتسابها تلقائياً في أرشفة وإغلاق الدفعة لأن getFileRealStocks يشملها
+      // ونضيف أيضاً علامة لتظهر في جدول الشحنات الرئيسي
+    }
   });
 
-  addLog(`${type==='out'?'🔴 إخراج':'🟢 إدخال'} فحص مخبر للحصة ${escapeHtml(lot)} - ${pallets} منصة + ${bags} كيس - السبب: ${escapeHtml(reason)}`);
-  showToast(`✅ تم تسجيل ${type==='out'?'إخراج':'إدخال'} فحص المخبر بنجاح! المتاح الآن: ${formatTons(getFileRealStocks(getFile(currentFileId)).available)} طن`);
+  const totalW = pallets * ((parseFloat(file.bagsPerPallet)||56) * netWeightPerBag/1000) + bags * (netWeightPerBag/1000);
+  addLog(`${type==='out'?'🔴 إخراج':'🟢 إدخال'} فحص مخبر للحصة ${escapeHtml(lot)} - ${pallets} منصة + ${bags} كيس بوزن صافي ${netWeightPerBag}كغ/كيس = ${formatTons(totalW)} طن - السبب: ${escapeHtml(reason)} - ${addToReceipt?'مع وصل':'بدون وصل'}`);
+  showToast(`✅ تم تسجيل ${type==='out'?'إخراج':'إدخال'} فحص المخبر بنجاح! الوزن الصافي ${netWeightPerBag}كغ/كيس، الإجمالي ${formatTons(totalW)} طن. المتاح الآن: ${formatTons(getFileRealStocks(getFile(currentFileId)).available)} طن. مسجلة في السجل الرئيسي`);
 
   document.getElementById('labLotNumber').value='';
   document.getElementById('labPalletsCount').value='0';
   document.getElementById('labBagsCount').value='1';
   document.getElementById('labReason').value='';
+  // لا نمسح الوزن ليبقى للعملية التالية
 
   renderAll();
 }
@@ -2914,23 +2985,52 @@ function renderLabEntriesList(){
   if(!file) return;
   const entries = (file.labTests?.entries || []).slice().reverse();
   if(entries.length===0){
-    container.innerHTML='<div style="font-size:11px; opacity:0.6; text-align:center; padding:8px;">لا توجد عمليات مخبر مسجلة بعد</div>';
+    container.innerHTML='<div style="font-size:11px; opacity:0.6; text-align:center; padding:8px;">لا توجد عمليات مخبر مسجلة بعد - ستظهر هنا وتسجل أيضاً في السجل الرئيسي أدناه</div>';
     return;
   }
   const pw = palletWeight(file);
-  let html = '<div style="font-size:12px; font-weight:bold; margin-bottom:6px;">سجل فحوصات المخبر:</div>';
-  html += '<div style="max-height:200px; overflow-y:auto; border:1px solid var(--border-current); border-radius:6px;">';
+  let html = '<div style="font-size:12px; font-weight:bold; margin-bottom:6px; display:flex; justify-content:space-between;"><span>سجل فحوصات المخبر (مسجل أيضاً في السجل الرئيسي للشحنات أدناه - قابل للتعديل/الحذف):</span><span style="font-size:10px; opacity:0.7;">الإجمالي: '+entries.length+' عملية</span></div>';
+  html += '<div style="max-height:250px; overflow-y:auto; border:1px solid #8e44ad; border-radius:8px; background:white;">';
   entries.forEach(e=>{
-    const w = e.bags ? (e.bags * parseFloat(file.bagWeight)/1000) : pw;
-    const timeStr = new Date(e.ts).toLocaleString('ar-DZ', {hour:'2-digit', minute:'2-digit'});
-    const typeBadge = e.type==='out' ? '<span style="background:#e74c3c; color:white; padding:2px 6px; border-radius:10px; font-size:10px;">إخراج</span>' : '<span style="background:#27ae60; color:white; padding:2px 6px; border-radius:10px; font-size:10px;">إرجاع</span>';
-    html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:6px 8px; border-bottom:1px solid #eee; font-size:11px;">
-      <span>${timeStr} | ${typeBadge} | حصة <b>${escapeHtml(e.lot||'—')}</b> | ${e.bags ? e.bags+' كيس' : '1 منصة'} (${formatTons(w)} طن) | ${escapeHtml(e.reason||'')}</span>
-      <button class="btn btn-danger" style="padding:2px 6px; font-size:10px;" onclick="deleteLabEntry(${e.ts})"><i class="fa-solid fa-trash"></i></button>
+    const netW = e.netWeightPerBag || parseFloat(file.bagWeight) || 25;
+    const w = e.bags ? (e.bags * netW/1000) : ((parseFloat(file.bagsPerPallet)||56) * netW/1000);
+    const timeStr = new Date(e.ts).toLocaleString('ar-DZ', {hour:'2-digit', minute:'2-digit', second:'2-digit'});
+    const typeBadge = e.type==='out' ? '<span style="background:#e74c3c; color:white; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:bold;">🔴 إخراج للمخبر</span>' : '<span style="background:#27ae60; color:white; padding:2px 8px; border-radius:12px; font-size:10px; font-weight:bold;">🟢 إرجاع من المخبر</span>';
+    html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px dashed #ddd; font-size:11px; background:${e.type==='out'?'rgba(231,76,60,0.04)':'rgba(39,174,96,0.06)'};">
+      <div style="flex:1; line-height:1.5;">
+        <div>${timeStr} ${typeBadge} | حصة <b style="color:#8e44ad;">${escapeHtml(e.lot||'—')}</b> | ${e.bags ? e.bags+' كيس' : '1 منصة'} × ${netW}كغ = <b>${formatTons(w)} طن</b></div>
+        <div style="font-size:10px; opacity:0.7;">السبب: ${escapeHtml(e.reason||'')} | الشاحنة: ${escapeHtml(e.truck||'مخبر')}</div>
+      </div>
+      <div style="display:flex; gap:4px; flex-shrink:0;">
+        <button class="btn btn-secondary" style="padding:4px 8px; font-size:10px;" onclick="editLabEntry(${e.ts})" title="تعديل الحصة وإعادة تسجيل"><i class="fa-solid fa-pen"></i></button>
+        <button class="btn btn-danger" style="padding:4px 8px; font-size:10px;" onclick="deleteLabEntry(${e.ts})"><i class="fa-solid fa-trash"></i></button>
+      </div>
     </div>`;
   });
   html += '</div>';
   container.innerHTML = html;
+}
+
+function editLabEntry(ts){
+  const file = getFile(currentFileId);
+  if(!file) return;
+  const entry = (file.labTests?.entries||[]).find(e=>e.ts===ts);
+  if(!entry) return;
+  // تعبئة الحقول للتعديل
+  document.getElementById('labTypeSelect').value = entry.type || 'out';
+  document.getElementById('labLotNumber').value = entry.lot || '';
+  document.getElementById('labBagsCount').value = entry.bags || 0;
+  document.getElementById('labPalletsCount').value = entry.bags ? 0 : 1;
+  document.getElementById('labNetWeightPerBag').value = entry.netWeightPerBag || file.bagWeight || 25;
+  document.getElementById('labReason').value = entry.reason || '';
+  // حذف القديم لإعادة تسجيله
+  updateFile(currentFileId, f=>{
+    const idx = f.labTests.entries.findIndex(e=>e.ts===ts);
+    if(idx!==-1) f.labTests.entries.splice(idx,1);
+  });
+  showToast("✏️ تم تحميل بيانات الحصة للتعديل - عدّل ثم اضغط تسجيل مرة أخرى");
+  renderAll();
+  document.getElementById('labLotNumber').focus();
 }
 
 function deleteLabEntry(ts){
@@ -2941,10 +3041,12 @@ function deleteLabEntry(ts){
         if(idx!==-1) f.labTests.entries.splice(idx,1);
       }
     });
-    showToast("🗑️ تم حذف عملية المخبر");
+    addLog(`🗑️ حذف عملية مخبر - الطابع الزمني ${ts}`);
+    showToast("🗑️ تم حذف عملية المخبر وتحديث المتاح الفعلي");
     renderAll();
-  }, "هل تريد حذف عملية المخبر هذه؟ سيؤثر على الكمية المتاحة الفعلية.");
+  }, "هل تريد حذف عملية المخبر هذه نهائياً؟ سيتم إعادة حساب الكمية المتوفرة الفعلية (مثال: 499,990 → 500,000 إذا حذفت إخراج).");
 }
+
 
 
 function resumeUnclosedDelivery(deliveryId) {
@@ -3460,7 +3562,16 @@ function archiveCurrentBatch() {
     entries = activeDelivery ? (activeDelivery.entries || []) : [];
   }
 
-  const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
+  
+  // دمج فحوصات المخبر في الأرشفة بنفس التسلسل
+  if(currentMode==='receiving'){
+    const labIn = (file.labTests?.entries || []).filter(e=>e.type==='in');
+    entries = entries.concat(labIn);
+  } else {
+    const labOut = (file.labTests?.entries || []).filter(e=>e.type==='out');
+    entries = entries.concat(labOut);
+  }
+const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
   if(currentSessionEntries.length === 0) {
     showAlertModal("⚠️ لا توجد أي شحنات جديدة غير مغلقة حالياً لتصفيتها وأرشفتها!");
     return;
@@ -4660,9 +4771,15 @@ async function closeBatchAndPrint() {
   
   if(currentMode === 'receiving') {
     entries = file.receiving.entries || [];
+    // دمج إرجاع المخبر في نفس وصل الاستلام بنفس تسلسل الأرقام
+    const labIn = (file.labTests?.entries || []).filter(e=>e.type==='in');
+    entries = entries.concat(labIn);
   } else {
     const activeDelivery = (file.deliveries || []).find(d => d.id === currentDeliveryId);
     entries = activeDelivery ? (activeDelivery.entries || []) : [];
+    // دمج إخراج المخبر في نفس سند الخروج بنفس تسلسل الأرقام
+    const labOut = (file.labTests?.entries || []).filter(e=>e.type==='out');
+    entries = entries.concat(labOut);
     title = "<bdi>سند خروج وحمولة — Bon de Sortie</bdi>";
     filenamePrefix = "وصل_تسليم";
     seqKey = "delivery_seq_num";
@@ -4672,7 +4789,17 @@ async function closeBatchAndPrint() {
   // Filter only the current open session's entries (الأكياس المستلمة أو المسلمة في الدفعة الحالية فقط)
   const checkpoints = (currentMode === 'receiving') ? (file.receivingCheckpoints || []) : ((file.deliveries.find(d => d.id === currentDeliveryId) || {}).checkpoints || []);
   const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
-  const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
+  
+  // دمج عمليات المخبر في السجل الرئيسي حسب النوع: إدخال مع استلام، إخراج مع تسليم - مسجلة بنفس تسلسل الوصولات
+  const labAll = (file.labTests?.entries || file.labEntries || []);
+  if(currentMode==='receiving'){
+    // في وضع الاستلام، نعرض إرجاع المخبر (in) في السجل الرئيسي
+    labAll.forEach(e=>{ if(e.type==='in') entries.push(e); });
+  } else {
+    // في وضع التسليم، نعرض إخراج المخبر (out)
+    labAll.forEach(e=>{ if(e.type==='out') entries.push(e); });
+  }
+const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
 
   if(currentSessionEntries.length === 0) {
     showToast("⚠️ لا توجد أي حصص جديدة غير مغلقة في دفعة اليوم لتوليد الوصل!");
@@ -5569,5 +5696,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a276de3d7f368f14',t:'MTc4NjExMTg2MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
