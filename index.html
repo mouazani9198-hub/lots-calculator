@@ -3668,7 +3668,13 @@ function renderLotsSummaryLog() {
     const totalPallets = item.pallets + (item.looseBags / (parseFloat(file.bagsPerPallet) || 56));
     const grossWeight = totalPallets * pw;
     const tornCount = item.pf + item.pm;
-    const tornWeight = (deductTornBagsChecked && currentMode === 'receiving') ? (tornCount * (parseFloat(file.bagWeight) || 25) / 1000) : 0;
+    // FIXED: استخدم calcTornTons لدعم PF<25كغ (1كغ فاقد) بدل bagWeight كامل
+    let tornWeight = 0;
+    if(deductTornBagsChecked && currentMode === 'receiving'){
+      // احسب الفاقد الحقيقي لكل إدخالات هذه الحصة
+      const allEntriesForLot = entries.filter(e=>e.lot===lot);
+      allEntriesForLot.forEach(e=>{ tornWeight += calcTornTons(e, file); });
+    }
     const netWeight = Math.max(0, grossWeight - tornWeight);
 
     const row = document.createElement('tr');
@@ -5361,7 +5367,15 @@ function exportAllToExcelActual() {
               if (e.ts < startTs) delBefore += e.bags ? (e.bags * bagW) : pw;
             });
           });
-          const initialQty = Math.max(0, recBefore - delBefore);
+          // حساب فحوصات المخبر قبل بداية الأسبوع
+          let labOutBefore = 0, labInBefore = 0;
+          (f.labTests?.entries || f.labEntries || []).forEach(e=>{
+            if(e.ts < startTs){
+              const w = e.bags ? (e.bags * bagW) : pw;
+              if(e.type==='out') labOutBefore+=w; else labInBefore+=w;
+            }
+          });
+          const initialQty = Math.max(0, recBefore - delBefore - labOutBefore + labInBefore);
 
           let inputsOfWeek = 0;
           (f.receiving.entries || []).forEach(e => {
@@ -5374,6 +5388,12 @@ function exportAllToExcelActual() {
               inputsOfWeek += Math.max(0, entryGross - entryTorn);
             }
           });
+          // إرجاع المخبر يعتبر مدخلات
+          (f.labTests?.entries || f.labEntries || []).forEach(e=>{
+            if(e.ts >= startTs && e.ts <= endTs && e.type==='in'){
+              inputsOfWeek += e.bags ? (e.bags * bagW) : pw;
+            }
+          });
 
           // C. Weekly Outputs (from Sunday 00:00 to Saturday 23:59)
           let outputsOfWeek = 0;
@@ -5381,6 +5401,12 @@ function exportAllToExcelActual() {
             (d.entries || []).forEach(e => {
               if (e.ts >= startTs && e.ts <= endTs) outputsOfWeek += e.bags ? (e.bags * bagW) : pw;
             });
+          });
+          // إخراج المخبر يعتبر مخرجات
+          (f.labTests?.entries || f.labEntries || []).forEach(e=>{
+            if(e.ts >= startTs && e.ts <= endTs && e.type==='out'){
+              outputsOfWeek += e.bags ? (e.bags * bagW) : pw;
+            }
           });
 
           // D. Final quantity at end of week
@@ -5475,6 +5501,28 @@ function exportAllToExcelActual() {
       XLSX.utils.book_append_sheet(wb, wsTorn, "تقرير التلف والأكياس الممزقة");
     }
 
+    // Sheet 5: تقرير فحوصات المخبر
+    const labData = [];
+    list.forEach(f=>{
+      (f.labTests?.entries || f.labEntries || []).forEach(e=>{
+        const w = e.bags ? (e.bags * parseFloat(f.bagWeight)/1000) : palletWeight(f);
+        labData.push({
+          "رقم الملف / BL": f.fileNumber,
+          "المستودع": f.warehouse || "سعيدة 1",
+          "نوع البودرة": f.powderType + " دسم",
+          "رقم الحصة": e.lot || "—",
+          "نوع العملية": e.type==='out' ? "إخراج للمخبر" : "إرجاع من المخبر",
+          "السبب / تقرير": e.reason || "—",
+          "الوزن (طن)": w,
+          "التاريخ": new Date(e.ts).toLocaleString('ar-DZ')
+        });
+      });
+    });
+    if(labData.length>0){
+      const wsLab = XLSX.utils.json_to_sheet(labData);
+      XLSX.utils.book_append_sheet(wb, wsLab, "تقرير فحوصات المخبر");
+    }
+
     XLSX.writeFile(wb, `تقرير_ERP_المستودعات_الشامل_${Date.now()}.xlsx`);
     showToast("💚 تم تصدير ملف Excel الشامل بنجاح!");
   };
@@ -5521,5 +5569,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a276c1d5186a09ad',t:'MTc4NjExMDY5Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a276de3d7f368f14',t:'MTc4NjExMTg2MQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
