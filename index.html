@@ -2580,6 +2580,7 @@ function renderAll() {
     renderFilesList();
   } else if(activeView === 'stock') {
     renderStockOverview();
+    renderAdminCustomerReport();
     renderAIPredictor(); // Run the dynamic AI predictive forecasting engine!
   } else if(activeView === 'customers') {
     renderCustomerBalances();
@@ -3956,19 +3957,12 @@ function renderAIPredictor() {
   recommendationEl.innerHTML = `بناءً على الرصيد المتوفر حالياً بالمخزن البالغ <b>${formatTons(remainingStock)} طن</b> ومعدل السحب الفعلي البالغ <b>${dailyRate.toFixed(3)} طن/يوم</b>، يتوقع محرك الذكاء الاصطناعي نفاد المخزون تماماً بحلول <b>${formattedDepletionDate}</b>.<br><br>` +
     `<i class="fa-solid fa-triangle-exclamation" style="color:var(--fb-amber);"></i> <b>توصية التوريد والتموين الذكية (AI):</b> نوصي الإدارة العامة بBoufarik بضرورة إعطاء رخصة التوريد والشحن للباخرة القادمة وجدولة تفريغها <b>قبل تاريخ ${formattedSafetyDate}</b> (فترة أمان 15 يوماً) لتجنب توقف ملبنات الغرب عن إنتاج الحليب المبستر.`;
 }
-          <div style="font-size:10px; opacity:0.8;">تاريخ: ${f.contractDate || '—'}</div>
-        </td>
-        <td>${formatTons(f.contractedQty)}</td>
-        <td>${formatTons(recTons)}</td>
-        <td>${formatTons(delTons)}</td>
-        <td style="color:var(--fb-green); font-weight:bold;">${formatTons(remainingTons)} طن</td>
-      `;
-      indFilesBody.appendChild(row);
-    });
-  }
 
-  // Render "مسيرة المخازن" administrative customer balances report
+// Render "مسيرة المخازن" administrative customer balances report
+function renderAdminCustomerReport() {
+  const list = loadFiles();
   const adminClientBody = document.getElementById('adminCustomerReportBody');
+  if(!adminClientBody) return;
   adminClientBody.innerHTML = '';
 
   list.forEach(f => {
@@ -5363,5 +5357,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27616ab5ccd6d96',t:'MTc4NjEwMzY4Ng=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
