@@ -4458,36 +4458,18 @@ function renderFilesList() {
   }
 
   list.forEach(f => {
-    // Calculate dynamic lot quantities inside this file
-    const pw = palletWeight(f);
-    let lotMap = {};
-    (f.receiving.entries || []).forEach(e => {
-      if(!e.lot) return;
-      if(!lotMap[e.lot]) lotMap[e.lot] = 0;
-      let entryTornW = 0;
-      if (shouldDeductTorn(e)) {
-        entryTornW = calcTornTons(e, f);
-      }
-      lotMap[e.lot] += Math.max(0, entryWeight(e, f) - entryTornW);
-    });
-    (f.deliveries || []).forEach(d => {
-      (d.entries || []).forEach(e => {
-        if(!e.lot) return;
-        if(lotMap[e.lot] !== undefined) lotMap[e.lot] -= entryWeight(e, f);
-      });
-    });
-    // Subtract lab out and add lab in per lot
-    const labEntries = f.labTests?.entries || f.labEntries || [];
-    labEntries.forEach(e=>{
-      if(!e.lot) return;
-      if(lotMap[e.lot]===undefined) lotMap[e.lot]=0;
-      const w = entryWeight(e,f);
-      if(e.type==='out') lotMap[e.lot]-=w;
-      else lotMap[e.lot]+=w;
-    });
+    // رصيد كل حصة عبر المعادلة الموحدة (يشمل الممزق والمخبر والتسويات الميدانية - يطابق كل الشاشات)
+    const lotMap = {};
+    const allLots = new Set();
+    (f.receiving?.entries || []).forEach(e => { if(e.lot) allLots.add(e.lot); });
+    (f.deliveries || []).forEach(d => (d.entries || []).forEach(e => { if(e.lot) allLots.add(e.lot); }));
+    (f.labTests?.entries || f.labEntries || []).forEach(e => { if(e.lot) allLots.add(e.lot); });
+    (f.adjustments || []).forEach(a => { if(a.lot) allLots.add(a.lot); if(a.toLot) allLots.add(a.toLot); });
+    allLots.forEach(l => { lotMap[l] = getLotAvailable(f, l); });
+
     let lotsHtml = Object.keys(lotMap)
-      .filter(l => lotMap[l] > 0.001)
-      .map(l => `<span style="display:inline-block; background:rgba(49, 162, 76, 0.1); color:var(--fb-green); padding:3px 6px; border-radius:4px; margin:2px; font-size:11.5px; border: 1px solid var(--fb-green);"><b>${l}</b>: ${lotMap[l].toFixed(3)} طن</span>`)
+      .filter(l => lotMap[l] > 0.0001)
+      .map(l => `<span style="display:inline-block; background:rgba(49, 162, 76, 0.1); color:var(--fb-green); padding:3px 6px; border-radius:4px; margin:2px; font-size:11.5px; border: 1px solid var(--fb-green);"><b>${l}</b>: ${formatTonsSmart(lotMap[l])} طن</span>`)
       .join(' ');
     if(!lotsHtml) lotsHtml = '<span style="opacity:0.6; font-size:11px;">لا يوجد رصيد حصص</span>';
 
@@ -6386,5 +6368,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e4f2c82b2c6d96',t:'MTc4NzI2NjEzNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
