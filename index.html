@@ -1312,6 +1312,7 @@ tr:hover {
       <h2><i class="fa-solid fa-sliders" style="color:var(--fb-amber);"></i> 🛠️ سجل التسويات الميدانية (تعديل الكميات بعد الإغلاق)</h2>
       <div style="font-size:12px; opacity:0.85; line-height:1.6; margin-bottom:10px;">
         🔹 للحوادث الميدانية بعد إغلاق الدفعة أو اكتمال الاستلام: زيادة/نقصان كمية، تحويل أكياس لممزق، إلغاء ممزق، أو نقل كمية بين حصتين (تصحيح رقم مسجل بالخطأ).<br>
+        🔹 مبدأ الحساب: <b>إنقاص 10 كغ من 500 طن = 499.99 طن</b>. أدخل الوزن المباشر <b>بالكيلوغرام</b> (حتى 300غ = 0.3) فيُحوَّل تلقائياً للطن مع عرض المعادل بالأرطال (الرطل = <b>0.5 كغ</b>)، وحدد <b>الوزن الناقص لكل كيس بالكيلوغرام</b> في الممزق الجزئي (مثلاً 3 أكياس كل كيس ناقص 1 كغ).<br>
         🔹 التعديل <b>لا يمس الوصلات المطبوعة</b> بل يُسجل كتسوية موثقة (تاريخ + سبب إلزامي) تُضاف أو تُطرح من الرصيد الفعلي وتظهر في كل الشاشات والتقارير والتصدير.
       </div>
       <div class="form-row">
@@ -1343,6 +1344,18 @@ tr:hover {
           <label>الأكياس السائبة</label>
           <input type="number" id="adjBagsCount" min="0" value="0">
         </div>
+        <div class="field" id="adjDirectKgField" style="display:none;">
+          <label>الوزن المباشر (كيلوغرام) - يُحوَّل تلقائياً للطن</label>
+          <input type="number" id="adjDirectKgInput" min="0" step="0.1" placeholder="مثال: 10 كغ (300غ = 0.3 | الرطل = 0.5)" oninput="updateAdjWeightHelp()">
+          <div id="adjDirectTonsHelp" style="font-size:11px; font-weight:bold; color:var(--fb-amber); margin-top:2px; min-height:16px;">💡 الرطل = <b>0.5 كغ</b> = <b>0.0005 طن</b> | أصغر تعديل: 300غ = <b>0.3</b> كغ | مثال: 10 كغ = 0,01 طن</div>
+          <div style="display:flex; flex-wrap:wrap; gap:4px; margin-top:4px;">
+            <button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:10px; margin:0;" onclick="setAdjKgPreset(0.3)">300غ</button>
+            <button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:10px; margin:0;" onclick="setAdjKgPreset(0.5)">رطل (0.5 كغ)</button>
+            <button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:10px; margin:0;" onclick="setAdjKgPreset(1)">1 كغ</button>
+            <button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:10px; margin:0;" onclick="setAdjKgPreset(5)">5 كغ</button>
+            <button type="button" class="btn btn-secondary" style="padding:2px 8px; font-size:10px; margin:0;" onclick="setAdjKgPreset(10)">10 كغ</button>
+          </div>
+        </div>
       </div>
       <div class="form-row" id="adjTornFields" style="display:none;">
         <div class="field">
@@ -1354,12 +1367,14 @@ tr:hover {
           <input type="number" id="adjPM" min="0" value="0">
         </div>
         <div class="field">
-          <label>وزن فاقد PF (كغ)</label>
-          <input type="number" id="adjPFWeight" min="0" step="0.1" placeholder="25">
+          <label>الوزن الناقص لكل كيس PF (كيلوغرام)</label>
+          <input type="number" id="adjPFWeight" min="0" step="0.1" placeholder="1 = كيس ناقص 1كغ (فارغ = كيس كامل)">
+          <div style="font-size:10px; opacity:0.7; margin-top:2px;">الرطل = 0.5 كغ | 300غ = 0.3 كغ | كيس كامل = 25 كغ</div>
         </div>
         <div class="field">
-          <label>وزن فاقد PM (كغ)</label>
-          <input type="number" id="adjPMWeight" min="0" step="0.1" placeholder="25">
+          <label>الوزن الناقص لكل كيس PM (كيلوغرام)</label>
+          <input type="number" id="adjPMWeight" min="0" step="0.1" placeholder="1 = كيس ناقص 1كغ (فارغ = كيس كامل)">
+          <div style="font-size:10px; opacity:0.7; margin-top:2px;">الرطل = 0.5 كغ | 300غ = 0.3 كغ | كيس كامل = 25 كغ</div>
         </div>
       </div>
       <div class="form-row">
@@ -2282,7 +2297,50 @@ function addLog(text){
 
 function genId(){ return 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 function roundTo3(v){ return Math.round((parseFloat(v)||0)*1000)/1000; }
-function formatTons(v){ return roundTo3(v).toLocaleString('fr-FR', {minimumFractionDigits:3, maximumFractionDigits:3}); }
+function formatTons(v){
+  // مبدأ الحساب الجديد: خانتان عشريتان (499.99 طن)
+  const r = Math.round((parseFloat(v) || 0) * 100) / 100;
+  return r.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+}
+// تنسيق ذكي: 4 خانات عشرية للكميات الصغيرة دون 0.01 طن (دقة الرطل = 0.5 كغ = 0.0005 طن و 300غ = 0.0003 طن)
+function formatTonsSmart(v){
+  const x = parseFloat(v) || 0;
+  const abs = Math.abs(x);
+  if(abs > 0 && abs < 0.01){
+    return (Math.round(x * 10000) / 10000).toLocaleString('fr-FR', {minimumFractionDigits:4, maximumFractionDigits:4});
+  }
+  return formatTons(x);
+}
+// الرطل المعتمد لدى الديوان = 0.5 كغ = 0.0005 طن | أصغر تعديل = 300غ = 0.3 كغ = 0.0003 طن
+const RATAL_TONS = 0.0005;
+const RATAL_KG = 0.5;
+const MIN_ADJ_GRAMS = 300; // 300غ
+// محول حي من الكيلوغرام: يعرض المعادل بالطن والأرطال
+function formatKg(v){ const r = Math.round(v * 1000) / 1000; return r.toLocaleString('fr-FR', {maximumFractionDigits:3}); }
+function weightFromKgText(kgVal){
+  const kg = parseFloat(kgVal);
+  if(!kg || kg <= 0) return '';
+  const tons = kg / 1000;
+  const rattals = Math.round((kg / RATAL_KG) * 10) / 10;
+  return `= ${formatTonsSmart(tons)} طن = ${rattals.toLocaleString('fr-FR')} رطل`;
+}
+function updateAdjWeightHelp(){
+  const input = document.getElementById('adjDirectKgInput');
+  const help = document.getElementById('adjDirectTonsHelp');
+  if(!input || !help) return;
+  const v = parseFloat(input.value) || 0;
+  if(v <= 0){
+    help.innerHTML = '💡 الرطل = <b>0.5 كغ</b> = <b>0.0005 طن</b> | أصغر تعديل: 300غ = <b>0.3</b> كغ | مثال: 10 كغ = 0,01 طن';
+    return;
+  }
+  help.innerHTML = `${weightFromKgText(v)} <span style="opacity:0.7;">(الرطل = 0.5 كغ)</span>`;
+}
+function setAdjKgPreset(kg){
+  const input = document.getElementById('adjDirectKgInput');
+  if(!input) return;
+  input.value = String(kg);
+  updateAdjWeightHelp();
+}
 
 function getLocalDateString() {
   const d = new Date();
@@ -2589,6 +2647,7 @@ function adjustmentWeight(a, file){
   const pw = palletWeight(file);
   const pallets = parseInt(a.pallets) || 0;
   const bags = parseInt(a.bags) || 0;
+  const directTons = adjustmentDirectTons(a); // وزن مباشر بالطن (التعديلات الصغيرة - الرطل = 0.0005 طن)
   if(a.type === 'torn' || a.type === 'untorn'){
     let pfW = a.pfWeight != null ? parseFloat(a.pfWeight) : defW;
     let pmW = a.pmWeight != null ? parseFloat(a.pmWeight) : defW;
@@ -2598,7 +2657,14 @@ function adjustmentWeight(a, file){
     pmW = Math.max(0, Math.min(pmW, defW));
     return ((parseFloat(a.pf) || 0) * pfW + (parseFloat(a.pm) || 0) * pmW) / 1000;
   }
-  return pallets * pw + bags * (defW / 1000);
+  return pallets * pw + bags * (defW / 1000) + directTons;
+}
+
+// الوزن المباشر بالتسوية بالطن (يدعم البيانات القديمة المخزنة بالكيلوغرام directKg)
+function adjustmentDirectTons(a){
+  let t = parseFloat(a.directTons) || 0;
+  if(t === 0 && parseFloat(a.directKg)) t = parseFloat(a.directKg) / 1000;
+  return t;
 }
 
 // أثر تسوية على رصيد حصة معينة (موجب = إضافة للرصيد، سالب = خصم من الرصيد)
@@ -2901,7 +2967,7 @@ function renderAll() {
     strip.style.display = 'flex';
     const stocks = getFileRealStocks(file);
     document.getElementById('activeFileTitle').textContent = `📁 ملف نشط: ${file.fileNumber} (عقد ${file.contractNumber || '—'})`;
-    const adjStrip = ((stocks.adjIn || 0) > 0 || (stocks.adjOut || 0) > 0) ? ` | تسويات (+${formatTons(stocks.adjIn||0)} / -${formatTons(stocks.adjOut||0)})` : '';
+    const adjStrip = ((stocks.adjIn || 0) > 0 || (stocks.adjOut || 0) > 0) ? ` | تسويات (+${formatTonsSmart(stocks.adjIn||0)} / -${formatTonsSmart(stocks.adjOut||0)})` : '';
     document.getElementById('activeFilePowder').textContent = `بودرة دسم ${file.powderType} | المتاح فعلياً: ${formatTons(stocks.available)} طن (المستلم ${formatTons(stocks.rec)} - ممزق ${formatTons(stocks.torn)} - مخبر إخراج ${formatTons(stocks.labOut)} + إرجاع ${formatTons(stocks.labIn)} - مسلم ${formatTons(stocks.del)}${adjStrip})`;
   } else {
     strip.style.display = 'none';
@@ -3281,6 +3347,7 @@ function onAdjTypeChange(){
   const type = document.getElementById('adjTypeSelect').value;
   document.getElementById('adjToLotField').style.display = (type === 'move') ? 'flex' : 'none';
   document.getElementById('adjTornFields').style.display = (type === 'torn' || type === 'untorn') ? 'flex' : 'none';
+  document.getElementById('adjDirectKgField').style.display = (type === 'add' || type === 'remove' || type === 'move') ? 'flex' : 'none';
 }
 
 function addAdjustment(){
@@ -3294,6 +3361,8 @@ function addAdjustment(){
   const toLot = document.getElementById('adjToLotNumber').value.trim();
   const pallets = parseInt(document.getElementById('adjPalletsCount').value) || 0;
   const bags = parseInt(document.getElementById('adjBagsCount').value) || 0;
+  const directKg = parseFloat(document.getElementById('adjDirectKgInput').value) || 0;
+  const directTons = directKg / 1000;
   const pf = parseInt(document.getElementById('adjPF').value) || 0;
   const pm = parseInt(document.getElementById('adjPM').value) || 0;
   const reason = document.getElementById('adjReason').value.trim();
@@ -3316,8 +3385,8 @@ function addAdjustment(){
       showToast("⚠️ لا يمكن النقل إلى نفس الحصة!");
       return;
     }
-    if(pallets === 0 && bags === 0){
-      showToast("⚠️ حدد كمية النقل!");
+    if(pallets === 0 && bags === 0 && directKg === 0){
+      showToast("⚠️ حدد كمية النقل (منصات أو أكياس أو وزن مباشر بالكيلوغرام)!");
       return;
     }
   } else if(type === 'torn' || type === 'untorn'){
@@ -3326,23 +3395,24 @@ function addAdjustment(){
       return;
     }
   } else {
-    if(pallets === 0 && bags === 0){
-      showToast("⚠️ حدد كمية التعديل!");
+    if(pallets === 0 && bags === 0 && directKg === 0){
+      showToast("⚠️ حدد كمية التعديل (منصات أو أكياس أو وزن مباشر بالكيلوغرام)!");
       return;
     }
   }
 
   const defW = parseFloat(file.bagWeight) || 25;
+  // إدخال المستخدم بالكيلوغرام مباشرة (نفس وحدة المخبر وباقي النظام)
   let pfW = parseFloat(document.getElementById('adjPFWeight').value);
   let pmW = parseFloat(document.getElementById('adjPMWeight').value);
-  if(isNaN(pfW) || pfW < 0) pfW = defW;
+  if(isNaN(pfW) || pfW < 0) pfW = defW; // فارغ = كيس كامل
   if(isNaN(pmW) || pmW < 0) pmW = defW;
   if(pfW > defW || pmW > defW){
-    showAlertModal(`🛑 <b>خطأ في وزن الفاقد:</b><br>وزن الفاقد يجب أن يكون بين 0 و ${defW} كغ.`);
+    showAlertModal(`🛑 <b>خطأ في وزن الفاقد:</b><br>الوزن الناقص لكل كيس يجب أن يكون بين 0 و ${defW} كغ (وزن الكيس الكامل).`);
     return;
   }
 
-  const adj = { id: 'adj_' + Date.now(), ts: Date.now(), type, lot, toLot: type === 'move' ? toLot : undefined, pallets, bags, pf, pm, pfWeight: pfW, pmWeight: pmW, reason, incidentDate };
+  const adj = { id: 'adj_' + Date.now(), ts: Date.now(), type, lot, toLot: type === 'move' ? toLot : undefined, pallets, bags, directKg, directTons, pf, pm, pfWeight: pfW, pmWeight: pmW, reason, incidentDate };
   const w = adjustmentWeight(adj, file);
 
   // منع خصم أكبر من الرصيد المتاح للحصة (نقصان / ممزق / نقل من حصة)
@@ -3355,7 +3425,10 @@ function addAdjustment(){
   }
 
   const typeNames = { add: '➕ زيادة', remove: '➖ نقصان', torn: '🧻 تحويل لممزق', untorn: '♻️ إلغاء ممزق', move: '🔀 نقل' };
-  const effectTxt = (type === 'move') ? `نقل ${formatTons(w)} طن` : ((type === 'add' || type === 'untorn') ? `+${formatTons(w)} طن` : `-${formatTons(w)} طن`);
+  // عرض الأثر: بالكغ إذا كان التعديل بالوزن المباشر فقط، وإلا بالطن
+  const wTxt = formatTonsSmart(w) + ' طن';
+  const kgSuffix = (directKg > 0 && pallets === 0 && bags === 0 && pf === 0 && pm === 0) ? ` (${formatKg(directKg)} كغ)` : '';
+  const effectTxt = (type === 'move') ? `نقل ${wTxt}${kgSuffix}` : ((type === 'add' || type === 'untorn') ? `+${wTxt}${kgSuffix}` : `-${wTxt}${kgSuffix}`);
 
   askConfirmation(() => {
     updateFile(currentFileId, f => {
@@ -3368,6 +3441,8 @@ function addAdjustment(){
     document.getElementById('adjToLotNumber').value = '';
     document.getElementById('adjPalletsCount').value = '0';
     document.getElementById('adjBagsCount').value = '0';
+    document.getElementById('adjDirectKgInput').value = '';
+    updateAdjWeightHelp();
     document.getElementById('adjPF').value = '0';
     document.getElementById('adjPM').value = '0';
     document.getElementById('adjPFWeight').value = '';
@@ -3375,7 +3450,7 @@ function addAdjustment(){
     document.getElementById('adjReason').value = '';
     document.getElementById('adjIncidentDate').value = '';
     renderAll();
-  }, `🛠️ <b>تأكيد تسجيل التسوية الميدانية:</b><br><br>النوع: <b>${typeNames[type]}</b><br>الحصة: <b>${escapeHtml(lot)}</b>${toLot ? ' ← إلى: <b>' + escapeHtml(toLot) + '</b>' : ''}<br>الكمية: ${pallets} منصة + ${bags} كيس ${(pf || pm) ? '+ ممزق PF=' + pf + ' / PM=' + pm : ''}<br><br>الأثر على الرصيد: <b>${effectTxt}</b><br><br>السبب: ${escapeHtml(reason)}<br><br><span style="font-size:11px;">ملاحظة: الوصلات المطبوعة سابقاً لن تتغير - هذه تسوية إضافية موثقة في السجل.</span>`);
+  }, `🛠️ <b>تأكيد تسجيل التسوية الميدانية:</b><br><br>النوع: <b>${typeNames[type]}</b><br>الحصة: <b>${escapeHtml(lot)}</b>${toLot ? ' ← إلى: <b>' + escapeHtml(toLot) + '</b>' : ''}<br>الكمية: ${pallets} منصة + ${bags} كيس ${directKg > 0 ? '+ وزن مباشر ' + formatKg(directKg) + ' كغ' : ''} ${(pf || pm) ? '+ ممزق PF=' + pf + ' / PM=' + pm : ''}<br><br>الأثر على الرصيد: <b>${effectTxt}</b><br><br>السبب: ${escapeHtml(reason)}<br><br><span style="font-size:11px;">ملاحظة: الوصلات المطبوعة سابقاً لن تتغير - هذه تسوية إضافية موثقة في السجل.</span>`);
 }
 
 function renderAdjustmentsList(){
@@ -3398,9 +3473,13 @@ function renderAdjustmentsList(){
     const sign = signs[a.type] || 0;
     const timeStr = new Date(a.ts).toLocaleString('ar-DZ', {hour:'2-digit', minute:'2-digit'});
     const color = sign > 0 ? 'var(--fb-green)' : sign < 0 ? 'var(--fb-red)' : 'var(--fb-amber)';
+    // وزن مباشر صغير يُعرض بالكيلوغرام (أوضح من 0.000 طن)
+    const directT = adjustmentDirectTons(a);
+    const directKgShow = a.directKg != null ? parseFloat(a.directKg) : (directT * 1000);
+    const wTxt = (sign > 0 ? '+' : sign < 0 ? '−' : '') + formatTonsSmart(w) + ' طن';
     html += `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px; border-bottom:1px dashed var(--border-current); font-size:11px;">
       <div style="flex:1; line-height:1.5;">
-        <div>${timeStr} <b>${typeNames[a.type] || a.type}</b> | حصة <b>${escapeHtml(a.lot || '—')}</b>${a.toLot ? ' → ' + escapeHtml(a.toLot) : ''} | ${a.pallets ? a.pallets + ' منصة ' : ''}${a.bags ? a.bags + ' كيس ' : ''}${a.pf ? 'PF=' + a.pf + ' ' : ''}${a.pm ? 'PM=' + a.pm + ' ' : ''}| <b style="color:${color};">${sign > 0 ? '+' : sign < 0 ? '−' : ''}${formatTons(w)} طن</b></div>
+        <div>${timeStr} <b>${typeNames[a.type] || a.type}</b> | حصة <b>${escapeHtml(a.lot || '—')}</b>${a.toLot ? ' → ' + escapeHtml(a.toLot) : ''} | ${a.pallets ? a.pallets + ' منصة ' : ''}${a.bags ? a.bags + ' كيس ' : ''}${directKgShow > 0 ? 'وزن مباشر ' + formatKg(directKgShow) + ' كغ ' : ''}${a.pf ? 'PF=' + a.pf + ' ' : ''}${a.pm ? 'PM=' + a.pm + ' ' : ''}| <b style="color:${color};">${wTxt}</b></div>
         <div style="font-size:10px; opacity:0.7;">السبب: ${escapeHtml(a.reason || '')} ${a.incidentDate ? '| تاريخ الحادثة: ' + escapeHtml(a.incidentDate) : ''}</div>
       </div>
       <div style="display:flex; gap:4px; flex-shrink:0;">
@@ -3423,10 +3502,12 @@ function editAdjustment(id){
   document.getElementById('adjToLotNumber').value = a.toLot || '';
   document.getElementById('adjPalletsCount').value = a.pallets || 0;
   document.getElementById('adjBagsCount').value = a.bags || 0;
+  document.getElementById('adjDirectKgInput').value = (a.directKg != null ? a.directKg : (a.directTons != null ? (parseFloat(a.directTons) * 1000) : ''));
+  updateAdjWeightHelp();
   document.getElementById('adjPF').value = a.pf || 0;
   document.getElementById('adjPM').value = a.pm || 0;
-  document.getElementById('adjPFWeight').value = a.pfWeight || '';
-  document.getElementById('adjPMWeight').value = a.pmWeight || '';
+  document.getElementById('adjPFWeight').value = (a.pfWeight != null ? a.pfWeight : '');
+  document.getElementById('adjPMWeight').value = (a.pmWeight != null ? a.pmWeight : '');
   document.getElementById('adjReason').value = a.reason || '';
   document.getElementById('adjIncidentDate').value = a.incidentDate || '';
   onAdjTypeChange();
@@ -3679,7 +3760,7 @@ function renderSuggestedChips() {
       chip.className = 'chip';
       
       if (currentMode === 'delivery' && item.available !== null) {
-        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${escapeHtml(item.lot)} <span style="font-size:11px; font-weight:bold; color:var(--fb-red); margin-right:5px; background: rgba(255,0,0,0.1); padding: 2px 5px; border-radius: 4px;">(${formatTons(item.available)} طن متاح)</span>`;
+        chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${escapeHtml(item.lot)} <span style="font-size:11px; font-weight:bold; color:var(--fb-red); margin-right:5px; background: rgba(255,0,0,0.1); padding: 2px 5px; border-radius: 4px;">(${formatTonsSmart(item.available)} طن متاح)</span>`;
       } else {
         chip.innerHTML = `<i class="fa-solid fa-tag"></i> ${escapeHtml(item.lot)}`;
       }
@@ -4044,7 +4125,7 @@ function renderShipmentEntriesTable() {
       (file.adjustments || []).forEach(a => { if(a.lot) matchedLots.add(a.lot); if(a.toLot) matchedLots.add(a.toLot); });
       let lotTotal = 0;
       matchedLots.forEach(l => { if(l.includes(query)) lotTotal += getLotAvailable(file, l); });
-      lotSearchTotalDiv.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> إجمالي رصيد الحصة "${escapeHtml(query)}" في هذا الملف هو: <b>${lotTotal.toFixed(3)} طن</b>`;
+      lotSearchTotalDiv.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> إجمالي رصيد الحصة "${escapeHtml(query)}" في هذا الملف هو: <b>${formatTonsSmart(lotTotal)} طن</b>`;
       lotSearchTotalDiv.style.display = 'block';
     }
   } else if (lotSearchTotalDiv) {
@@ -4196,14 +4277,14 @@ function renderLotsSummaryLog() {
     let adjNetForLot = 0;
     (file.adjustments || []).forEach(a => { adjNetForLot += adjustmentNetForLot(a, file, lot); });
     const netWeight = Math.max(0, grossWeight - tornWeight + adjNetForLot);
-    const adjNote = (Math.abs(adjNetForLot) > 0.0005) ? `<div style="font-size:10px; color:var(--fb-amber);">تسويات: ${adjNetForLot > 0 ? '+' : ''}${formatTons(adjNetForLot)} طن</div>` : '';
+    const adjNote = (Math.abs(adjNetForLot) > 0.0005) ? `<div style="font-size:10px; color:var(--fb-amber);">تسويات: ${adjNetForLot > 0 ? '+' : ''}${formatTonsSmart(adjNetForLot)} طن</div>` : '';
 
     const row = document.createElement('tr');
     row.innerHTML = `
       <td><b>${escapeHtml(lot)}</b></td>
       <td>${item.pallets} منّصة ${item.looseBags > 0 ? '+ ' + item.looseBags + ' كيس' : ''}${adjNote}</td>
       <td><span style="color:var(--fb-red);">${tornCount} كيس (${item.pf} PF / ${item.pm} PM)</span></td>
-      <td><b>${formatTons(netWeight)} طن</b></td>
+      <td><b>${formatTonsSmart(netWeight)} طن</b></td>
       <td>
         <button class="btn btn-secondary" style="padding:4px 8px; font-size:11px;" onclick="openEditLotModal('${escapeHtml(lot)}', ${item.pallets}, ${item.looseBags}, ${item.pf}, ${item.pm})">
           <i class="fa-solid fa-pencil"></i> تعديل
@@ -6243,6 +6324,8 @@ function exportAllToExcelActual() {
           "الحصة المحول إليها": a.toLot || '—',
           "المنصات": a.pallets || 0,
           "الأكياس": a.bags || 0,
+          "الوزن المباشر (طن)": adjustmentDirectTons(a),
+          "الوزن المباشر (كغ)": (a.directKg != null ? parseFloat(a.directKg) : (adjustmentDirectTons(a) * 1000)),
           "ممزق PF": a.pf || 0,
           "ممزق PM": a.pm || 0,
           "الوزن (طن)": adjustmentWeight(a, f),
@@ -6303,5 +6386,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e4aed5ef970d46',t:'MTc4NzI2MzM1Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e4f2c82b2c6d96',t:'MTc4NzI2NjEzNg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
