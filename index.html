@@ -2488,6 +2488,25 @@ function shouldDeductTorn(entry){
   return false; // الإدخالات القديمة (قبل التحديث): لا خصم تلقائي - يمكن تعديلها من عمود "خصم الممزق" في الجدول
 }
 
+// --- دالة موحدة لتجميع إدخالات الجلسة الجارية (مع دمج المخبر مرة واحدة فقط) ---
+// تمنع أي ازدواج أو تداخل بين الإغلاق والأرشفة وإعادة الطباعة - تُستخدم في كل مكان
+function collectCloseEntries(file, mode, deliveryId){
+  let entries = [];
+  if(mode === 'receiving') {
+    entries = (file.receiving.entries || []).slice();
+    const labIn = (file.labTests?.entries || file.labEntries || []).filter(e => e.type === 'in');
+    entries = entries.concat(labIn);
+  } else {
+    const d = (file.deliveries || []).find(x => x.id === deliveryId);
+    entries = d ? (d.entries || []).slice() : [];
+    const labOut = (file.labTests?.entries || file.labEntries || []).filter(e => e.type === 'out');
+    entries = entries.concat(labOut);
+  }
+  const checkpoints = (mode === 'receiving') ? (file.receivingCheckpoints || []) : (((file.deliveries || []).find(d => d.id === deliveryId) || {}).checkpoints || []);
+  const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
+  return entries.filter(e => e.ts > lastCheckpointTs);
+}
+
 // --- حساب مخزون الملف الحقيقي شامل فحوصات المخبر (إخراج/إدخال) مع وزن صافي يدوي لكل كيس ناقص ---
 function getFileRealStocks(file){
   if(!file) return {rec:0,torn:0,labOut:0,labIn:0,del:0,available:0};
@@ -3281,10 +3300,11 @@ function renderSuggestedChips() {
     // Collect all lots that have some received stock physically in the warehouse
     const receivedLotsStats = {};
     
-    // Sum receiving
+    // Sum receiving (صافي بعد خصم الممزق المسجل لكل إدخال - يطابق فحص رصيد الحصة عند التسليم)
     (file.receiving.entries || []).forEach(e => {
       if (!e.lot) return;
       receivedLotsStats[e.lot] = (receivedLotsStats[e.lot] || 0) + entryWeight(e, file);
+      if (shouldDeductTorn(e)) receivedLotsStats[e.lot] -= calcTornTons(e, file);
     });
     
     // Subtract delivered
@@ -3443,31 +3463,34 @@ function addShipmentBatch() {
 
 
   // --- NEW VALIDATION: PF can be <25kg, but must be within limits and count <= bags ---
-  const pfCount = parseFloat(document.getElementById('generalPF').value) || 0;
-  const pmCount = parseFloat(document.getElementById('generalPM').value) || 0;
-  let pfWCheck = parseFloat(document.getElementById('generalPFWeight')?.value);
-  let pmWCheck = parseFloat(document.getElementById('generalPMWeight')?.value);
-  const bagWCheck = parseFloat(file.bagWeight) || 25;
-  const bppCheck = parseFloat(file.bagsPerPallet) || 56;
-  if(isNaN(pfWCheck)) pfWCheck = bagWCheck;
-  if(isNaN(pmWCheck)) pmWCheck = bagWCheck;
-  if(pfWCheck <0 || pfWCheck > bagWCheck || pmWCheck <0 || pmWCheck > bagWCheck){
-    showAlertModal(`🛑 <b>خطأ في وزن الفاقد:</b><br>وزن الفاقد يجب أن يكون بين 0 و ${bagWCheck} كغ. PF يمكن أن يكون أقل من 25كغ (مثلاً 1كغ)، لكن لا يمكن أن يتجاوز وزن الكيس الأصلي.`);
-    return;
-  }
-  // Check PF+PM <= total bags available
-  const totalBagsInEntry = numPallets>0 ? (numPallets * bppCheck + numBags) : (numBags || bppCheck);
-  // If entry is loose bags only, total is numBags
-  const actualTotalBags = numPallets>0 ? (numPallets * bppCheck + numBags) : numBags;
-  const tornBagsTotal = pfCount + pmCount;
-  // For loose bags, pf+pm should not exceed loose count if only loose
-  if(numPallets===0 && numBags>0 && tornBagsTotal > numBags){
-    showAlertModal(`🛑 <b>مستحيل:</b> عدد الأكياس الممزقة (${tornBagsTotal}) أكبر من عدد الأكياس السائبة المدخلة (${numBags})!`);
-    return;
-  }
-  if(numPallets>0 && tornBagsTotal > totalBagsInEntry){
-    showAlertModal(`🛑 <b>مستحيل:</b> عدد الأكياس الممزقة (${tornBagsTotal}) أكبر من إجمالي أكياس الدفعة (${totalBagsInEntry} كيس = ${numPallets} منصة × ${bppCheck} + ${numBags} سائب)!`);
-    return;
+  // (فحوصات الممزق تخص وضع الاستلام فقط - لا تُعيق التسليم بالقيم المتبقية في الحقول المخفية)
+  if(currentMode === 'receiving') {
+    const pfCount = parseFloat(document.getElementById('generalPF').value) || 0;
+    const pmCount = parseFloat(document.getElementById('generalPM').value) || 0;
+    let pfWCheck = parseFloat(document.getElementById('generalPFWeight')?.value);
+    let pmWCheck = parseFloat(document.getElementById('generalPMWeight')?.value);
+    const bagWCheck = parseFloat(file.bagWeight) || 25;
+    const bppCheck = parseFloat(file.bagsPerPallet) || 56;
+    if(isNaN(pfWCheck)) pfWCheck = bagWCheck;
+    if(isNaN(pmWCheck)) pmWCheck = bagWCheck;
+    if(pfWCheck <0 || pfWCheck > bagWCheck || pmWCheck <0 || pmWCheck > bagWCheck){
+      showAlertModal(`🛑 <b>خطأ في وزن الفاقد:</b><br>وزن الفاقد يجب أن يكون بين 0 و ${bagWCheck} كغ. PF يمكن أن يكون أقل من 25كغ (مثلاً 1كغ)، لكن لا يمكن أن يتجاوز وزن الكيس الأصلي.`);
+      return;
+    }
+    // Check PF+PM <= total bags available
+    const totalBagsInEntry = numPallets>0 ? (numPallets * bppCheck + numBags) : (numBags || bppCheck);
+    // If entry is loose bags only, total is numBags
+    const actualTotalBags = numPallets>0 ? (numPallets * bppCheck + numBags) : numBags;
+    const tornBagsTotal = pfCount + pmCount;
+    // For loose bags, pf+pm should not exceed loose count if only loose
+    if(numPallets===0 && numBags>0 && tornBagsTotal > numBags){
+      showAlertModal(`🛑 <b>مستحيل:</b> عدد الأكياس الممزقة (${tornBagsTotal}) أكبر من عدد الأكياس السائبة المدخلة (${numBags})!`);
+      return;
+    }
+    if(numPallets>0 && tornBagsTotal > totalBagsInEntry){
+      showAlertModal(`🛑 <b>مستحيل:</b> عدد الأكياس الممزقة (${tornBagsTotal}) أكبر من إجمالي أكياس الدفعة (${totalBagsInEntry} كيس = ${numPallets} منصة × ${bppCheck} + ${numBags} سائب)!`);
+      return;
+    }
   }
 
 
@@ -3596,28 +3619,8 @@ function archiveCurrentBatch() {
   const file = getFile(currentFileId);
   if(!file) return;
 
-  // Calculate current unclosed session entries
-  const checkpoints = (currentMode === 'receiving') ? (file.receivingCheckpoints || []) : (((file.deliveries || []).find(d => d.id === currentDeliveryId) || {}).checkpoints || []);
-  const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
-
-  let entries = [];
-  if(currentMode === 'receiving') {
-    entries = file.receiving.entries || [];
-  } else {
-    const activeDelivery = (file.deliveries || []).find(d => d.id === currentDeliveryId);
-    entries = activeDelivery ? (activeDelivery.entries || []) : [];
-  }
-
-  
-  // دمج فحوصات المخبر في الأرشفة بنفس التسلسل (مرة واحدة فقط)
-  if(currentMode==='receiving'){
-    const labIn = (file.labTests?.entries || file.labEntries || []).filter(e=>e.type==='in');
-    entries = entries.concat(labIn);
-  } else {
-    const labOut = (file.labTests?.entries || file.labEntries || []).filter(e=>e.type==='out');
-    entries = entries.concat(labOut);
-  }
-const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
+  // تجميع إدخالات الجلسة الجارية عبر الدالة الموحدة (دمج المخبر مرة واحدة فقط - لا ازدواج)
+  const currentSessionEntries = collectCloseEntries(file, currentMode, currentDeliveryId);
   if(currentSessionEntries.length === 0) {
     showAlertModal("⚠️ لا توجد أي شحنات جديدة غير مغلقة حالياً لتصفيتها وأرشفتها!");
     return;
@@ -3699,16 +3702,19 @@ function renderShipmentEntriesTable() {
     
     // Calculate precise stock inside this file for the searched lot
     if (lotSearchTotalDiv && file) {
-      let lotRec = 0, lotDel = 0;
+      let lotRec = 0, lotTorn = 0, lotDel = 0;
       (file.receiving.entries || []).forEach(e => {
-        if (e.lot && e.lot.includes(query)) lotRec += entryWeight(e, file);
+        if (e.lot && e.lot.includes(query)) {
+          lotRec += entryWeight(e, file);
+          if (shouldDeductTorn(e)) lotTorn += calcTornTons(e, file);
+        }
       });
       (file.deliveries || []).forEach(d => {
         (d.entries || []).forEach(e => {
           if (e.lot && e.lot.includes(query)) lotDel += entryWeight(e, file);
         });
       });
-      const lotTotal = Math.max(0, lotRec - lotDel);
+      const lotTotal = Math.max(0, lotRec - lotTorn - lotDel);
       lotSearchTotalDiv.innerHTML = `<i class="fa-solid fa-boxes-stacked"></i> إجمالي رصيد الحصة "${escapeHtml(query)}" في هذا الملف هو: <b>${lotTotal.toFixed(3)} طن</b>`;
       lotSearchTotalDiv.style.display = 'block';
     }
@@ -4822,35 +4828,20 @@ async function closeBatchAndPrint() {
     return;
   }
 
-  let entries = [];
   let title = "<bdi>وصل استلام رسمي — Bon de Réception</bdi>";
   let filenamePrefix = "وصل_استلام";
   let seqKey = "receiving_seq_num";
   let checkpointKey = "receivingCheckpoints";
   
-  if(currentMode === 'receiving') {
-    entries = file.receiving.entries || [];
-    // دمج إرجاع المخبر في نفس وصل الاستلام بنفس تسلسل الأرقام (مرة واحدة فقط)
-    const labIn = (file.labTests?.entries || file.labEntries || []).filter(e=>e.type==='in');
-    entries = entries.concat(labIn);
-  } else {
-    const activeDelivery = (file.deliveries || []).find(d => d.id === currentDeliveryId);
-    entries = activeDelivery ? (activeDelivery.entries || []) : [];
-    // دمج إخراج المخبر في نفس سند الخروج بنفس تسلسل الأرقام (مرة واحدة فقط)
-    const labOut = (file.labTests?.entries || file.labEntries || []).filter(e=>e.type==='out');
-    entries = entries.concat(labOut);
+  if(currentMode !== 'receiving') {
     title = "<bdi>سند خروج وحمولة — Bon de Sortie</bdi>";
     filenamePrefix = "وصل_تسليم";
     seqKey = "delivery_seq_num";
     checkpointKey = "checkpoints";
   }
 
-  // Filter only the current open session's entries (الأكياس المستلمة أو المسلمة في الدفعة الحالية فقط)
-  const checkpoints = (currentMode === 'receiving') ? (file.receivingCheckpoints || []) : ((file.deliveries.find(d => d.id === currentDeliveryId) || {}).checkpoints || []);
-  const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
-  
-  // دمج عمليات المخبر تم بالفعل في الكتلة العلوية (إدخال مع استلام، إخراج مع تسليم) - لا نعيد الدمج هنا تجنباً لاحتسابها مرتين
-const currentSessionEntries = entries.filter(e => e.ts > lastCheckpointTs);
+  // تجميع إدخالات الجلسة الجارية عبر الدالة الموحدة (دمج المخبر مرة واحدة فقط - لا ازدواج)
+  const currentSessionEntries = collectCloseEntries(file, currentMode, currentDeliveryId);
 
   if(currentSessionEntries.length === 0) {
     showToast("⚠️ لا توجد أي حصص جديدة غير مغلقة في دفعة اليوم لتوليد الوصل!");
@@ -5380,34 +5371,22 @@ function exportAllToExcelActual() {
     const list = loadFiles();
     const wb = XLSX.utils.book_new();
 
-    // 1. Sheet 1: الملفات والمخازن (Files & Real Stock)
+    // 1. Sheet 1: الملفات والمخازن (Files & Real Stock) - متسقة تماماً مع معادلة المخزون الموحدة
     let filesData = [];
     list.forEach(f => {
-      const pw = palletWeight(f);
-      let recTons = 0;
-      let totalTornDeduction = 0;
-
-      (f.receiving.entries || []).forEach(e => {
-        recTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
-        if (shouldDeductTorn(e)) {
-          totalTornDeduction += calcTornTons(e, f);
-        }
-      });
-      recTons = Math.max(0, recTons - totalTornDeduction);
-
-      let delTons = 0;
-      (f.deliveries || []).forEach(d => {
-        (d.entries || []).forEach(e => {
-          delTons += e.bags ? (e.bags * parseFloat(f.bagWeight) / 1000) : pw;
-        });
-      });
-      const remainingTons = Math.max(0, recTons - delTons);
+      const stocks = getFileRealStocks(f);
+      const recTons = stocks.rec;
+      const totalTornDeduction = stocks.torn;
+      const labOutTons = stocks.labOut;
+      const labInTons = stocks.labIn;
+      const delTons = stocks.del;
+      const remainingTons = stocks.available;
       
-      // Calculate remaining quantities per Lot number for this specific file
+      // Calculate remaining quantities per Lot number (بما في ذلك عمليات المخبر لكل حصة)
       const lotMap = {};
       (f.receiving.entries || []).forEach(e => {
         if (!e.lot) return;
-        if (!lotMap[e.lot]) lotMap[e.lot] = 0;
+        if (lotMap[e.lot] === undefined) lotMap[e.lot] = 0;
         const entryW = entryWeight(e, f);
         let entryTornW = 0;
         if (shouldDeductTorn(e)) {
@@ -5420,6 +5399,12 @@ function exportAllToExcelActual() {
           if (!e.lot) return;
           if (lotMap[e.lot] !== undefined) lotMap[e.lot] -= entryWeight(e, f);
         });
+      });
+      (f.labTests?.entries || f.labEntries || []).forEach(e => {
+        if (!e.lot) return;
+        if (lotMap[e.lot] === undefined) lotMap[e.lot] = 0;
+        if(e.type === 'out') lotMap[e.lot] -= entryWeight(e, f);
+        else lotMap[e.lot] += entryWeight(e, f);
       });
       
       const availableLots = Object.keys(lotMap).filter(lot => lotMap[lot] > 0.001);
@@ -5435,6 +5420,9 @@ function exportAllToExcelActual() {
           "الرصيد الفعلي للحصة (طن)": 0,
           "الكمية المتعاقد عليها (طن)": f.contractedQty,
           "المستلم الفعلي (طن)": recTons,
+          "الممزق المخصوم (طن)": totalTornDeduction,
+          "مخبر إخراج (طن)": labOutTons,
+          "مخبر إرجاع (طن)": labInTons,
           "المسلم الكلي (طن)": delTons,
           "إجمالي الرصيد المتاح (طن)": remainingTons
         });
@@ -5451,6 +5439,9 @@ function exportAllToExcelActual() {
               "الرصيد الفعلي للحصة (طن)": parseFloat(lotMap[lot].toFixed(3)),
               "الكمية المتعاقد عليها (طن)": f.contractedQty,
               "المستلم الفعلي (طن)": recTons,
+              "الممزق المخصوم (طن)": totalTornDeduction,
+              "مخبر إخراج (طن)": labOutTons,
+              "مخبر إرجاع (طن)": labInTons,
               "المسلم الكلي (طن)": delTons,
               "إجمالي الرصيد المتاح (طن)": remainingTons
             });
@@ -5465,6 +5456,9 @@ function exportAllToExcelActual() {
               "الرصيد الفعلي للحصة (طن)": parseFloat(lotMap[lot].toFixed(3)),
               "الكمية المتعاقد عليها (طن)": "",
               "المستلم الفعلي (طن)": "",
+              "الممزق المخصوم (طن)": "",
+              "مخبر إخراج (طن)": "",
+              "مخبر إرجاع (طن)": "",
               "المسلم الكلي (طن)": "",
               "إجمالي الرصيد المتاح (طن)": ""
             });
@@ -5551,7 +5545,7 @@ function exportAllToExcelActual() {
           let labOutBefore = 0, labInBefore = 0;
           (f.labTests?.entries || f.labEntries || []).forEach(e=>{
             if(e.ts < startTs){
-              const w = e.bags ? (e.bags * bagW) : pw;
+              const w = entryWeight(e, f);
               if(e.type==='out') labOutBefore+=w; else labInBefore+=w;
             }
           });
@@ -5571,7 +5565,7 @@ function exportAllToExcelActual() {
           // إرجاع المخبر يعتبر مدخلات
           (f.labTests?.entries || f.labEntries || []).forEach(e=>{
             if(e.ts >= startTs && e.ts <= endTs && e.type==='in'){
-              inputsOfWeek += e.bags ? (e.bags * bagW) : pw;
+              inputsOfWeek += entryWeight(e, f);
             }
           });
 
@@ -5585,7 +5579,7 @@ function exportAllToExcelActual() {
           // إخراج المخبر يعتبر مخرجات
           (f.labTests?.entries || f.labEntries || []).forEach(e=>{
             if(e.ts >= startTs && e.ts <= endTs && e.type==='out'){
-              outputsOfWeek += e.bags ? (e.bags * bagW) : pw;
+              outputsOfWeek += entryWeight(e, f);
             }
           });
 
@@ -5654,13 +5648,15 @@ function exportAllToExcelActual() {
     list.forEach(f => {
       let totalPF = 0;
       let totalPM = 0;
-      let tornWeightDeduction = 0;
+      let tornWeightDeduction = 0; // كل الممزق فعلياً (تقرير التلف المادي)
+      let deductedFromStock = 0;   // ما خُصم فعلاً من الرصيد حسب قرار كل إدخال
       (f.receiving.entries || []).forEach(e => {
         const pfVal = parseFloat(e.pf) || 0;
         const pmVal = parseFloat(e.pm) || 0;
         totalPF += pfVal;
         totalPM += pmVal;
         tornWeightDeduction += calcTornTons(e, f);
+        if (shouldDeductTorn(e)) deductedFromStock += calcTornTons(e, f);
       });
 
       if (totalPF > 0 || totalPM > 0) {
@@ -5671,7 +5667,8 @@ function exportAllToExcelActual() {
           "نوع البودرة": f.powderType + " دسم",
           "إرجاع للمورد (PF) - كيس": totalPF,
           "مسلم للملبنة (PM) - كيس": totalPM,
-          "إجمالي الوزن المهدور/الممزق (طن)": tornWeightDeduction
+          "إجمالي الوزن المهدور/الممزق (طن)": tornWeightDeduction,
+          "الوزن المخصوم فعلياً من الرصيد (طن)": deductedFromStock
         });
       }
     });
@@ -5685,7 +5682,7 @@ function exportAllToExcelActual() {
     const labData = [];
     list.forEach(f=>{
       (f.labTests?.entries || f.labEntries || []).forEach(e=>{
-        const w = e.bags ? (e.bags * parseFloat(f.bagWeight)/1000) : palletWeight(f);
+        const w = entryWeight(e, f);
         labData.push({
           "رقم الملف / BL": f.fileNumber,
           "المستودع": f.warehouse || "سعيدة 1",
@@ -5749,5 +5746,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e28055be16d929',t:'MTc4NzI0MDQ3Nw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e2b63efbfb12c0',t:'MTc4NzI0MjY4NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
