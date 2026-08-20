@@ -1418,6 +1418,9 @@ tr:hover {
           <i class="fa-solid fa-cloud-arrow-down"></i> استرجاع نسخة احتياطية
         </button>
         <input type="file" id="restoreBackupInput" style="display:none;" accept=".json" onchange="restoreBackup(event)">
+        <button class="btn btn-secondary" onclick="runLegacyMigrationTool()" title="استرجاع قرارات خصم الأكياس الممزقة للبيانات المستوردة من نسخة قديمة">
+          <i class="fa-solid fa-right-left"></i> ترحيل بيانات نسخة قديمة (خصم الممزق)
+        </button>
         <button class="btn btn-secondary" onclick="adjustReceiptNumbering()">
           <i class="fa-solid fa-hashtag"></i> ضبط ترقيم الوصولات
         </button>
@@ -2162,6 +2165,7 @@ let currentMode = 'receiving'; // 'receiving' or 'delivery'
 let currentDeliveryId = '';
 let activeView = 'home';
 let confirmAction = null;
+let confirmCancelAction = null;
 let currentEditingLot = '';
 let currentTornBagsMethod = 'total'; // 'total' (deduct globally) or 'individual' (per truck)
 let isShipmentRegisterCollapsed = false;
@@ -2180,7 +2184,18 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
-function loadFiles(){ try{ return JSON.parse(_safeStorage.getItem(FILES_KEY)) || []; }catch(e){ return []; } }
+function loadFiles(){
+  let files;
+  try{ files = JSON.parse(_safeStorage.getItem(FILES_KEY)) || []; }catch(e){ return []; }
+  // ترحيل تلقائي صامت لبيانات النسخ القديمة عند كل قراءة (يستنتج قرار خصم الممزق من نقاط الأرشفة فقط - آمن ومتكرر بدون أثر)
+  if(Array.isArray(files) && files.length) {
+    const res = analyzeAndMigrateLegacyTorn(files);
+    if(res.fromCheckpoints > 0 || res.zeroTorn > 0 || res.normalizedFiles > 0) {
+      try{ _safeStorage.setItem(FILES_KEY, JSON.stringify(files)); }catch(e){}
+    }
+  }
+  return files;
+}
 function saveFiles(list){ _safeStorage.setItem(FILES_KEY, JSON.stringify(list)); }
 function loadLogs(){ try { return JSON.parse(_safeStorage.getItem(SYSTEM_LOGS_KEY)) || []; } catch(e){ return []; } }
 function saveLogs(list){ _safeStorage.setItem(SYSTEM_LOGS_KEY, JSON.stringify(list)); }
@@ -2277,8 +2292,9 @@ function showToast(msg) {
 }
 
 // Toast confirmations (Pop-up)
-function askConfirmation(action, msg, htmlContent = '') {
+function askConfirmation(action, msg, htmlContent = '', onCancel = null) {
   confirmAction = action;
+  confirmCancelAction = onCancel;
   const body = document.getElementById('confirmModalBody');
   if (htmlContent) {
     body.innerHTML = msg + htmlContent;
@@ -2301,8 +2317,12 @@ function closeConfirmModal(accepted) {
   document.getElementById('confirmModal').classList.remove('active');
   const actionToExecute = confirmAction;
   confirmAction = null; // Clear it before executing to prevent wiping out chained confirmations
+  const cancelToExecute = confirmCancelAction;
+  confirmCancelAction = null;
   if(accepted && actionToExecute) {
     actionToExecute();
+  } else if(!accepted && cancelToExecute) {
+    cancelToExecute();
   }
 }
 
@@ -5304,6 +5324,7 @@ function deleteCustomerConfirm(fileId, deliveryId) {
 // --- BACKUP, RESTORE AND SETTINGS TOOLS ---
 function triggerBackup() {
   const data = {
+    dataVersion: 2, // إصدار بنية البيانات الحالي (قرار خصم الممزق مسجل مع كل إدخال)
     files: loadFiles(),
     logs: loadLogs()
   };
@@ -5315,6 +5336,115 @@ function triggerBackup() {
   showToast("💾 تم تحميل ملف النسخة الاحتياطية بنجاح!");
 }
 
+// =============================================================
+// أداة ترحيل بيانات النسخ القديمة (خصم الممزق لكل إدخال)
+// =============================================================
+// دراسة الحالات الممكنة لكل البيانات المعالجة:
+//  1) إدخال استلام ضمن دفعة مؤرشفة ونقطة الأرشفة تحمل deductTorn صريحاً → يُطبق نفس القرار (استرجاع دقيق)
+//  2) إدخال بدون ممزق (PF+PM=0) → false (لا أثر على الحساب)
+//  3) إدخال يحمل قراراً سابقاً (boolean) → لا يُمس أبداً
+//  4) إدخال غير مؤرشفة أو نقطة أرشفته بلا قرار → "غامض" يُعرض على المستخدم ليقرر
+//  5) إدخالات التسليم → false دائماً (الممزق لا يُسجل في التسليم)
+//  6) بنى قديمة ناقصة (receiving/deliveries غير موجودة، labEntries القديم) → تُطبع بأمان
+// الدالة متكررة بدون أثر (idempotent): كل تشغيل لاحق يتخطى ما سبق البت فيه
+function analyzeAndMigrateLegacyTorn(files){
+  const result = { fromCheckpoints: 0, zeroTorn: 0, alreadySet: 0, normalizedFiles: 0, ambiguous: [] };
+  (Array.isArray(files) ? files : []).forEach(f => {
+    if(!f || typeof f !== 'object') return;
+    // تطبيع البنى الناقصة/القديمة
+    let normalized = false;
+    if(!f.receiving || typeof f.receiving !== 'object') { f.receiving = { entries: [] }; normalized = true; }
+    if(!Array.isArray(f.receiving.entries)) { f.receiving.entries = []; normalized = true; }
+    if(!Array.isArray(f.deliveries)) { f.deliveries = []; normalized = true; }
+    if(f.labEntries && !f.labTests) { f.labTests = { entries: f.labEntries }; normalized = true; }
+    if(normalized) result.normalizedFiles++;
+
+    const entries = f.receiving.entries;
+    const cps = (Array.isArray(f.receivingCheckpoints) ? f.receivingCheckpoints : [])
+      .slice()
+      .sort((a, b) => (a && a.ts ? a.ts : 0) - (b && b.ts ? b.ts : 0));
+
+    entries.forEach(entry => {
+      if(!entry || typeof entry !== 'object') return;
+      if(typeof entry.deductTorn === 'boolean') { result.alreadySet++; return; }
+      const hasTorn = (parseFloat(entry.pf) || 0) + (parseFloat(entry.pm) || 0) > 0;
+      if(!hasTorn) { entry.deductTorn = false; result.zeroTorn++; return; }
+      const cp = cps.find(c => c && ((c.ts || 0) >= (entry.ts || 0)));
+      if(cp && (cp.deductTorn === true || cp.deductTorn === false)) {
+        entry.deductTorn = cp.deductTorn;
+        result.fromCheckpoints++;
+        return;
+      }
+      // غامض: يُترك بلا قرار حتى يقرر المستخدم (ويعامل كـ "بدون خصم" حتى ذلك الحين)
+      result.ambiguous.push({ file: f, entry });
+    });
+
+    // إدخالات التسليم لا يُطبق عليها خصم الممزق أبداً
+    f.deliveries.forEach(d => {
+      (Array.isArray(d.entries) ? d.entries : []).forEach(e => {
+        if(e && typeof e === 'object' && typeof e.deductTorn !== 'boolean') e.deductTorn = false;
+      });
+    });
+  });
+  return result;
+}
+
+function ambiguousTornWeight(list){
+  let w = 0;
+  list.forEach(a => { w += calcTornTons(a.entry, a.file); });
+  return w;
+}
+
+function applyAmbiguousDecision(list, apply){
+  list.forEach(a => { a.entry.deductTorn = !!apply; });
+  return ambiguousTornWeight(list);
+}
+
+function buildMigrationSummaryText(result, ambWeight, ambCount, applied){
+  const lines = [];
+  if(result.fromCheckpoints > 0) lines.push(`• <b>${result.fromCheckpoints}</b> دفعة استُرجعت حالة خصمها بدقة من سجل أرشفتها.`);
+  if(ambCount > 0) lines.push(`• <b>${ambCount}</b> دفعة غير محسومة في النسخة القديمة ${applied ? 'فُعِّل الخصم عليها' : 'تُركت بدون خصم'} (وزن ممزقها <b>${formatTons(ambWeight)} طن</b>).`);
+  if(result.zeroTorn > 0) lines.push(`• <b>${result.zeroTorn}</b> دفعة بدون أكياس ممزقة ضُبطت تلقائياً.`);
+  if(result.alreadySet > 0) lines.push(`• <b>${result.alreadySet}</b> دفعة لها قرار سابق ولم تُمس.`);
+  if(result.normalizedFiles > 0) lines.push(`• طُبّعت بنية <b>${result.normalizedFiles}</b> ملف من تنسيق قديم.`);
+  lines.push('💡 لتعديل قرار أي دفعة يدوياً: عمود "خصم الممزق" في جدول سجل الشحنات.');
+  return lines.join('<br>');
+}
+
+// الزر اليدوي: ترحيل البيانات الموجودة حالياً في التخزين (بدون إعادة استيراد)
+function runLegacyMigrationTool(){
+  const files = loadFiles();
+  if(!files || files.length === 0) {
+    showToast("⚠️ لا توجد ملفات في التخزين لترحيلها!");
+    return;
+  }
+  const result = analyzeAndMigrateLegacyTorn(files);
+  const ambCount = result.ambiguous.length;
+  const ambWeight = ambiguousTornWeight(result.ambiguous);
+
+  const finish = (applied) => {
+    applyAmbiguousDecision(result.ambiguous, applied);
+    saveFiles(files);
+    renderAll();
+    showAlertModal(
+      `✅ <b>اكتمل ترحيل بيانات النسخة القديمة:</b><br><br>` +
+      buildMigrationSummaryText(result, ambWeight, ambCount, applied),
+      "اكتمل الترحيل", false
+    );
+  };
+
+  if(ambCount > 0) {
+    askConfirmation(
+      () => finish(true),
+      `🔄 <b>ترحيل بيانات النسخة القديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة من سجل أرشفتها.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) لكن حالة خصمها لم تكن مسجلة في النسخة القديمة — إجمالي وزن ممزقها <b>${formatTons(ambWeight)} طن</b>.<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟ (يمكنك تعديل أي دفعة لاحقاً من عمود "خصم الممزق" في الجدول)`,
+      '',
+      () => finish(false)
+    );
+  } else {
+    finish(false);
+  }
+}
+
 function restoreBackup(event) {
   const file = event.target.files[0];
   if(!file) return;
@@ -5323,14 +5453,48 @@ function restoreBackup(event) {
   reader.onload = function(e) {
     try {
       const data = JSON.parse(e.target.result);
+      let files = null, logs = null;
       if (Array.isArray(data)) {
-        saveFiles(data);
-      } else if (data.files) {
-        saveFiles(data.files);
-        if (data.logs) saveLogs(data.logs);
+        files = data;
+      } else if (data && data.files) {
+        files = data.files;
+        if (data.logs) logs = data.logs;
+      } else {
+        showAlertModal("🛑 عذراً، ملف النسخة الاحتياطية غير صالح أو تالف!");
+        return;
       }
-      showToast("✅ تم استرجاع النسخة الاحتياطية بنجاح!");
-      setTimeout(() => window.location.reload(), 1500);
+      if(!Array.isArray(files)) {
+        showAlertModal("🛑 عذراً، ملف النسخة الاحتياطية غير صالح أو تالف!");
+        return;
+      }
+
+      // ترحيل قرارات خصم الممزق من النسخ القديمة (لا يمس القرارات المسجلة)
+      const result = analyzeAndMigrateLegacyTorn(files);
+      const ambCount = result.ambiguous.length;
+      const ambWeight = ambiguousTornWeight(result.ambiguous);
+
+      const completeRestore = (applyAmbiguous) => {
+        applyAmbiguousDecision(result.ambiguous, applyAmbiguous);
+        saveFiles(files);
+        if (logs) saveLogs(logs);
+        showAlertModal(
+          `✅ <b>تم استرجاع النسخة الاحتياطية بنجاح وترحيل بياناتها:</b><br><br>` +
+          buildMigrationSummaryText(result, ambWeight, ambCount, applyAmbiguous),
+          "اكتمل الاسترجاع", false
+        );
+        setTimeout(() => window.location.reload(), 3000);
+      };
+
+      if(ambCount > 0) {
+        askConfirmation(
+          () => completeRestore(true),
+          `🔄 <b>ترحيل نسخة احتياطية قديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) بوزن إجمالي <b>${formatTons(ambWeight)} طن</b> لكن حالتها غير مسجلة في النسخة القديمة.<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟`,
+          '',
+          () => completeRestore(false)
+        );
+      } else {
+        completeRestore(false);
+      }
     } catch(err) {
       showAlertModal("🛑 عذراً، ملف النسخة الاحتياطية غير صالح أو تالف!");
     }
@@ -5746,5 +5910,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e2b63efbfb12c0',t:'MTc4NzI0MjY4NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2e48731de6e31c1',t:'MTc4NzI2MTcyOQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
