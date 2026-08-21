@@ -2371,11 +2371,11 @@ function escapeHtml(unsafe) {
     .replace(/'/g, "&#039;");
 }
 
-function loadFiles(){
+function loadFiles(skipAutoMigrate){
   let files;
   try{ files = JSON.parse(_safeStorage.getItem(FILES_KEY)) || []; }catch(e){ return []; }
   // ترحيل تلقائي صامت لبيانات النسخ القديمة عند كل قراءة (يستنتج قرار خصم الممزق من نقاط الأرشفة فقط - آمن ومتكرر بدون أثر)
-  if(Array.isArray(files) && files.length) {
+  if(!skipAutoMigrate && Array.isArray(files) && files.length) {
     const res = analyzeAndMigrateLegacyTorn(files);
     if(res.fromCheckpoints > 0 || res.zeroTorn > 0 || res.normalizedFiles > 0) {
       try{ _safeStorage.setItem(FILES_KEY, JSON.stringify(files)); }catch(e){}
@@ -5980,7 +5980,8 @@ function triggerBackup() {
 //  5) إدخالات التسليم → false دائماً (الممزق لا يُسجل في التسليم)
 //  6) بنى قديمة ناقصة (receiving/deliveries غير موجودة، labEntries القديم) → تُطبع بأمان
 // الدالة متكررة بدون أثر (idempotent): كل تشغيل لاحق يتخطى ما سبق البت فيه
-function analyzeAndMigrateLegacyTorn(files){
+function analyzeAndMigrateLegacyTorn(files, opts){
+  const trustCheckpoints = !opts || opts.trustCheckpoints !== false;
   const result = { fromCheckpoints: 0, zeroTorn: 0, alreadySet: 0, normalizedFiles: 0, ambiguous: [] };
   (Array.isArray(files) ? files : []).forEach(f => {
     if(!f || typeof f !== 'object') return;
@@ -6005,13 +6006,14 @@ function analyzeAndMigrateLegacyTorn(files){
       const hasTorn = (parseFloat(entry.pf) || 0) + (parseFloat(entry.pm) || 0) > 0;
       if(!hasTorn) { entry.deductTorn = false; result.zeroTorn++; return; }
       const cp = cps.find(c => c && ((c.ts || 0) >= (entry.ts || 0)));
-      if(cp && (cp.deductTorn === true || cp.deductTorn === false)) {
+      if(trustCheckpoints && cp && (cp.deductTorn === true || cp.deductTorn === false)) {
         entry.deductTorn = cp.deductTorn;
+        entry.deductTornSource = 'checkpoint'; // موروث من سجل الأرشفة القديم - قابل لإعادة العرض على المستخدم
         result.fromCheckpoints++;
         return;
       }
       // غامض: يُترك بلا قرار حتى يقرر المستخدم (ويعامل كـ "بدون خصم" حتى ذلك الحين)
-      result.ambiguous.push({ file: f, entry });
+      result.ambiguous.push({ file: f, entry, cpHint: (cp && typeof cp.deductTorn === 'boolean') ? cp.deductTorn : null });
     });
 
     // إدخالات التسليم لا يُطبق عليها خصم الممزق أبداً
@@ -6022,6 +6024,91 @@ function analyzeAndMigrateLegacyTorn(files){
     });
   });
   return result;
+}
+
+// جمع الدفعات الممزقة التي لا يزال قرارها معلقاً (بما فيها الموروثة تلقائياً من سجل الأرشفة القديم)
+function collectUndecidedTornEntries(files){
+  const pending = [];
+  (files || []).forEach(f => {
+    (f.receiving?.entries || []).forEach(entry => {
+      if(!entry || typeof entry !== 'object') return;
+      const hasTorn = (parseFloat(entry.pf) || 0) + (parseFloat(entry.pm) || 0) > 0;
+      if(!hasTorn) return;
+      if(typeof entry.deductTorn === 'boolean'){
+        if(entry.deductTornSource === 'checkpoint'){
+          // قرار موروث من سجل الأرشفة القديم - يعاد عرضه على المستخدم لكل ملف
+          delete entry.deductTorn;
+          delete entry.deductTornSource;
+          pending.push({ file: f, entry, cpHint: null });
+        }
+        return; // قرار صريح حديث - لا يُمس
+      }
+      pending.push({ file: f, entry, cpHint: null });
+    });
+  });
+  return pending;
+}
+
+// قرار الخصم لكل ملف على حدة (سلسلة أسئلة متتابعة - لا قرار جماعي يطبق على ملفين معاً)
+function askTornDecisionsPerFile(files, pendingList, doneCb){
+  const byFile = [];
+  (files || []).forEach(f => {
+    const list = pendingList.filter(a => a.file === f);
+    if(list.length === 0) return;
+    let tons = 0, hintTrues = 0, hintFalses = 0;
+    list.forEach(a => {
+      tons += calcTornTons(a.entry, a.file);
+      if(a.cpHint === true) hintTrues++;
+      else if(a.cpHint === false) hintFalses++;
+    });
+    byFile.push({ file: f, list, tons, hintTrues, hintFalses });
+  });
+  let idx = 0;
+  const step = () => {
+    if(idx >= byFile.length){ if(doneCb) doneCb(); return; }
+    const item = byFile[idx];
+    idx++;
+    const hintLine = (item.hintTrues === item.list.length)
+      ? '<br><br><span style="font-size:11px;">ℹ️ سجل الأرشفة القديم لهذا الملف يشير إلى أن الخصم كان مفعلاً وقتها.</span>'
+      : ((item.hintFalses === item.list.length)
+        ? '<br><br><span style="font-size:11px;">ℹ️ سجل الأرشفة القديم لهذا الملف يشير إلى أن الخصم كان غير مفعّل وقتها.</span>'
+        : '');
+    askConfirmation(
+      () => { item.list.forEach(a => { a.entry.deductTorn = true; }); step(); },
+      `🧻 <b>خصم الممزق — ملف "${escapeHtml(item.file.fileNumber)}":</b><br><br>يحتوي هذا الملف على <b>${item.list.length}</b> دفعة بأكياس ممزقة (PF/PM) بوزن إجمالي <b>${formatTonsSmart(item.tons)} طن</b> وحالتها غير مسجلة في النسخة القديمة.<br><br>هل تريد تطبيق خصم وزنها على <b>هذا الملف فقط</b>؟ (كل ملف سيُسأل عنه منفصلاً)${hintLine}`,
+      '',
+      () => { item.list.forEach(a => { a.entry.deductTorn = false; }); step(); }
+    );
+  };
+  step();
+}
+
+// ملخص قرارات الخصم بعد اختيار المستخدم لكل ملف
+function tornDecisionSummaryText(files){
+  const lines = [];
+  (files || []).forEach(f => {
+    const tornEntries = (f.receiving?.entries || []).filter(e => (parseFloat(e.pf) || 0) + (parseFloat(e.pm) || 0) > 0);
+    if(tornEntries.length === 0) return;
+    const approved = tornEntries.filter(e => shouldDeductTorn(e)).length;
+    if(approved === 0){
+      lines.push(`• ملف <b>${escapeHtml(f.fileNumber)}</b>: بدون خصم (${tornEntries.length} دفعة ممزقة محسوبة بدون خصم).`);
+    } else if(approved === tornEntries.length){
+      lines.push(`• ملف <b>${escapeHtml(f.fileNumber)}</b>: خصم مفعّل على كل دفعاته الممزقة (${approved} دفعة).`);
+    } else {
+      lines.push(`• ملف <b>${escapeHtml(f.fileNumber)}</b>: خصم على ${approved} من ${tornEntries.length} دفعة.`);
+    }
+  });
+  return lines.length ? lines.join('<br>') : '';
+}
+
+// سطور إضافية لملخص الترحيل
+function migrationExtraSummaryText(result){
+  const parts = [];
+  if(result.zeroTorn > 0) parts.push(`• <b>${result.zeroTorn}</b> دفعة بدون أكياس ممزقة ضُبطت تلقائياً.`);
+  if(result.alreadySet > 0) parts.push(`• <b>${result.alreadySet}</b> دفعة لها قرار سابق ولم تُمس.`);
+  if(result.normalizedFiles > 0) parts.push(`• طُبّعت بنية <b>${result.normalizedFiles}</b> ملف من تنسيق قديم.`);
+  parts.push('💡 لتعديل قرار أي دفعة: عمود "خصم الممزق" في جدول سجل الشحنات، أو زر "ضبط خصم الممزق لكل دفعات الملف" في قائمة ملفات الشحنات.');
+  return parts.join('<br>');
 }
 
 // تفصيل الدفعات الغامضة حسب الملف (حتى يرى المستخدم أي ملف سيتأثر قبل القرار)
@@ -6060,35 +6147,30 @@ function buildMigrationSummaryText(result, ambWeight, ambCount, applied){
 
 // الزر اليدوي: ترحيل البيانات الموجودة حالياً في التخزين (بدون إعادة استيراد)
 function runLegacyMigrationTool(){
-  const files = loadFiles();
+  const files = loadFiles(true); // تحميل خام بدون الترحيل التلقائي حتى لا يُحسم قرار قبل سؤالك
   if(!files || files.length === 0) {
     showToast("⚠️ لا توجد ملفات في التخزين لترحيلها!");
     return;
   }
-  const result = analyzeAndMigrateLegacyTorn(files);
-  const ambCount = result.ambiguous.length;
-  const ambWeight = ambiguousTornWeight(result.ambiguous);
+  // لا نثق بقيم الأرشفة القديمة - قرار الخصم يُسأل عنه لكل ملف على حدة
+  const result = analyzeAndMigrateLegacyTorn(files, { trustCheckpoints: false });
+  const pending = collectUndecidedTornEntries(files); // يشمل الموروثة من سجل الأرشفة القديم
 
-  const finish = (applied) => {
-    applyAmbiguousDecision(result.ambiguous, applied);
+  const finish = () => {
     saveFiles(files);
     renderAll();
     showAlertModal(
       `✅ <b>اكتمل ترحيل بيانات النسخة القديمة:</b><br><br>` +
-      buildMigrationSummaryText(result, ambWeight, ambCount, applied),
+      (pending.length > 0 ? `<b>قرارات الخصم حسب اختيارك لكل ملف:</b><br>${tornDecisionSummaryText(files)}<br><br>` : '') +
+      migrationExtraSummaryText(result),
       "اكتمل الترحيل", false
     );
   };
 
-  if(ambCount > 0) {
-    askConfirmation(
-      () => finish(true),
-      `🔄 <b>ترحيل بيانات النسخة القديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة من سجل أرشفتها.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) لكن حالة خصمها لم تكن مسجلة في النسخة القديمة — إجمالي وزن ممزقها <b>${formatTons(ambWeight)} طن</b>.<br><br><b>تفصيلها حسب الملف:</b><br>${ambigBreakdownHtml(result)}<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟ (يمكنك تعديل أي دفعة لاحقاً من عمود "خصم الممزق" في الجدول)`,
-      '',
-      () => finish(false)
-    );
+  if(pending.length > 0) {
+    askTornDecisionsPerFile(files, pending, finish);
   } else {
-    finish(false);
+    finish();
   }
 }
 
@@ -6115,32 +6197,26 @@ function restoreBackup(event) {
         return;
       }
 
-      // ترحيل قرارات خصم الممزق من النسخ القديمة (لا يمس القرارات المسجلة)
-      const result = analyzeAndMigrateLegacyTorn(files);
-      const ambCount = result.ambiguous.length;
-      const ambWeight = ambiguousTornWeight(result.ambiguous);
+      // ترحيل قرارات خصم الممزق من النسخ القديمة - قرار لكل ملف على حدة (لا يمس القرارات المسجلة)
+      const result = analyzeAndMigrateLegacyTorn(files, { trustCheckpoints: false });
+      const pending = result.ambiguous;
 
-      const completeRestore = (applyAmbiguous) => {
-        applyAmbiguousDecision(result.ambiguous, applyAmbiguous);
+      const completeRestore = () => {
         saveFiles(files);
         if (logs) saveLogs(logs);
         showAlertModal(
           `✅ <b>تم استرجاع النسخة الاحتياطية بنجاح وترحيل بياناتها:</b><br><br>` +
-          buildMigrationSummaryText(result, ambWeight, ambCount, applyAmbiguous),
+          (pending.length > 0 ? `<b>قرارات الخصم حسب اختيارك لكل ملف:</b><br>${tornDecisionSummaryText(files)}<br><br>` : '') +
+          migrationExtraSummaryText(result),
           "اكتمل الاسترجاع", false
         );
         setTimeout(() => window.location.reload(), 3000);
       };
 
-      if(ambCount > 0) {
-        askConfirmation(
-          () => completeRestore(true),
-          `🔄 <b>ترحيل نسخة احتياطية قديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) بوزن إجمالي <b>${formatTons(ambWeight)} طن</b> لكن حالتها غير مسجلة في النسخة القديمة.<br><br><b>تفصيلها حسب الملف:</b><br>${ambigBreakdownHtml(result)}<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟`,
-          '',
-          () => completeRestore(false)
-        );
+      if(pending.length > 0) {
+        askTornDecisionsPerFile(files, pending, completeRestore);
       } else {
-        completeRestore(false);
+        completeRestore();
       }
     } catch(err) {
       showAlertModal("🛑 عذراً، ملف النسخة الاحتياطية غير صالح أو تالف!");
@@ -6778,5 +6854,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea5df30b216d96',t:'MTc4NzMyMjk1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea72700ecd2980',t:'MTc4NzMyMzc5Mw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
