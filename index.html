@@ -2623,12 +2623,18 @@ function askConfirmation(action, msg, htmlContent = '', onCancel = null) {
   document.getElementById('confirmModal').classList.add('active');
 }
 
-// Option to DEDUCT or NOT DEDUCT torn bags from net weight (يطبق على الدفعات الجديدة فقط)
+// Option to DEDUCT or NOT DEDUCT torn bags from net weight (يطبق على الملف النشط الحالي فقط)
 function toggleDeductTornBags() {
   deductTornBagsChecked = document.getElementById('deductTornBagsChecked').checked;
+  if(currentFileId){
+    // عزل كامل: القرار يُحفظ في الملف النشط وحده ولا يؤثر على أي ملف آخر
+    updateFile(currentFileId, f => { f.tornDeductDefault = deductTornBagsChecked; });
+  }
   _safeStorage.setItem('deduct_torn_bags', deductTornBagsChecked);
   renderAll();
-  showToast(deductTornBagsChecked ? "✅ سيتم خصم وزن الأكياس الممزقة من الدفعات الجديدة فقط" : "ℹ️ لن يُخصم وزن الممزق من الدفعات الجديدة (السجلات السابقة لا تتأثر)");
+  showToast(deductTornBagsChecked
+    ? "✅ سيتم خصم وزن الأكياس الممزقة من الدفعات الجديدة لهذا الملف فقط"
+    : "ℹ️ لن يُخصم وزن الممزق من الدفعات الجديدة لهذا الملف (الملفات الأخرى لا تتأثر)");
 }
 
 function closeConfirmModal(accepted) {
@@ -2818,6 +2824,18 @@ function getEntryTornInfo(entry, file){
   pfW = Math.max(0, Math.min(pfW, defW));
   pmW = Math.max(0, Math.min(pmW, defW));
   return {pfW, pmW};
+}
+
+// --- مزامنة مفتاح الخصم مع الملف النشط (عزل كامل: لكل ملف مفتاحه الخاص) ---
+function syncTornToggleWithActiveFile(){
+  const file = getFile(currentFileId);
+  if(!file) return;
+  // القيمة الافتراضية للخصم تخص هذا الملف وحده (افتراضياً مفعّل للملفات القديمة)
+  const val = (file.tornDeductDefault !== false);
+  deductTornBagsChecked = val;
+  const cb = document.getElementById('deductTornBagsChecked');
+  if(cb) cb.checked = val;
+  _safeStorage.setItem('deduct_torn_bags', val);
 }
 
 // --- قرار الخصم يُسجَّل مع كل إدخال وقت تسجيله ولا يتغير لاحقاً بالمفتاح العام ---
@@ -3180,6 +3198,7 @@ function renderAll() {
     calculateTonsToPallets();
     updateEntrySummary();
     updateApprovedTornSummary();
+    syncTornToggleWithActiveFile();
   } else if(activeView === 'shipments') {
     renderFilesList();
   } else if(activeView === 'stock') {
@@ -4169,7 +4188,7 @@ function proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm) {
       pfWeight: (i === 0 && currentMode === 'receiving') ? pfWeightRaw : defBagW,
       pmWeight: (i === 0 && currentMode === 'receiving') ? pmWeightRaw : defBagW,
       tornBagWeight: (i === 0 && currentMode === 'receiving') ? pfWeightRaw : defBagW, // legacy fallback
-      deductTorn: deductTornBagsChecked // قفل قرار الخصم وقت الإدخال (لا يتغير لاحقاً)
+      deductTorn: (currentMode === 'receiving') ? (file.tornDeductDefault !== false) : false // مفتاح الملف النشط الخاص به (عزل كامل بين الملفات)
     });
   }
 
@@ -4184,7 +4203,7 @@ function proceedWithAddShipment(file, lot, truck, numPallets, numBags, pf, pm) {
       pfWeight: (numPallets === 0 && currentMode === 'receiving') ? pfWeightRaw : defBagW,
       pmWeight: (numPallets === 0 && currentMode === 'receiving') ? pmWeightRaw : defBagW,
       tornBagWeight: (numPallets === 0 && currentMode === 'receiving') ? pfWeightRaw : defBagW,
-      deductTorn: deductTornBagsChecked // قفل قرار الخصم وقت الإدخال (لا يتغير لاحقاً)
+      deductTorn: (currentMode === 'receiving') ? (file.tornDeductDefault !== false) : false // مفتاح الملف النشط الخاص به (عزل كامل بين الملفات)
     });
   }
 
@@ -4647,7 +4666,8 @@ function createNewFile() {
     receiving: { entries: [] },
     deliveries: [],
     labTests: { entries: [] },
-    adjustments: []
+    adjustments: [],
+    tornDeductDefault: deductTornBagsChecked // مفتاح الخصم الافتراضي الخاص بهذا الملف وحده
   };
 
   const list = loadFiles();
@@ -4740,17 +4760,18 @@ function selectActiveFile(id) {
     currentFileId = id;
     currentDeliveryId = ''; // CRITICAL SYNC FIX: Reset delivery context when switching files to prevent ghost allocations
     _safeStorage.setItem(LAST_FILE_KEY, id);
-    if (fileToActivate) {
-      const pfWInput = document.getElementById('generalPFWeight');
-      const pmWInput = document.getElementById('generalPMWeight');
-      const legacyInput = document.getElementById('generalTornBagWeight');
-      if (pfWInput) pfWInput.value = 1; // default 1kg loss as requested
-      if (pmWInput) pmWInput.value = 1;
-      if (legacyInput) legacyInput.value = 1;
-    }
-    showToast("📁 تم تحديد وتنشيط الملف المختار!");
+    // عزل كامل لكل ملف: مفتاح الخصم يتبع هذا الملف، وحقول الممزق تُصفَّر كي لا تتسرب قيم من ملف آخر
+    syncTornToggleWithActiveFile();
+    const clearIds = ['quickLotNumber', 'generalPF', 'generalPM', 'generalPFWeight', 'generalPMWeight'];
+    clearIds.forEach(cid => {
+      const elInput = document.getElementById(cid);
+      if(elInput) elInput.value = '';
+    });
+    const legacyInput = document.getElementById('generalTornBagWeight');
+    if (legacyInput) legacyInput.value = 1;
+    showToast("📁 تم تحديد وتنشيط الملف المختار (بمفتاح الخصم الخاص به)!");
     renderAll();
-  }, `🔄 <b>تأكيد انتقال وتغيير الملف:</b><br><br>هل أنت متأكد من انتقالك للعمل وتنشيط الملف رقم <b>"${fileToActivate.fileNumber}"</b>؟<br><br>جميع العمليات القادمة (تسجيل شاحنات أو فتح حسابات زبائن) ستُسجل وتُخصم أوتوماتيكياً من هذا الملف.`);
+  }, `🔄 <b>تأكيد انتقال وتغيير الملف:</b><br><br>هل أنت متأكد من انتقالك للعمل وتنشيط الملف رقم <b>"${fileToActivate.fileNumber}"</b>؟<br><br>جميع العمليات القادمة (تسجيل شاحنات أو فتح حسابات زبائن) ستُسجل وتُخصم أوتوماتيكياً من هذا الملف، <b>وبإعدادات الخصم الخاصة به وحده دون تداخل مع الملفات الأخرى</b>.`);
 }
 
 function deleteActiveFileConfirm() {
@@ -5970,6 +5991,7 @@ function analyzeAndMigrateLegacyTorn(files){
     if(!Array.isArray(f.deliveries)) { f.deliveries = []; normalized = true; }
     if(f.labEntries && !f.labTests) { f.labTests = { entries: f.labEntries }; normalized = true; }
     if(!Array.isArray(f.adjustments)) { f.adjustments = []; normalized = true; }
+    if(typeof f.tornDeductDefault !== 'boolean') { f.tornDeductDefault = true; normalized = true; }
     if(normalized) result.normalizedFiles++;
 
     const entries = f.receiving.entries;
@@ -6756,5 +6778,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea4ee15ea2a4a7',t:'MTc4NzMyMjMzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea5df30b216d96',t:'MTc4NzMyMjk1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
