@@ -1,64 +1,40 @@
-// غيّر رقم النسخة عند كل تحديث للتطبيق حتى يتم تحميل النسخة الجديدة فورًا
-const CACHE_NAME = 'quota-calc-v3'; // Incremented version to force update
-const FILES_TO_CACHE = [
-  './index.html',
-  './manifest.json',
-  './icon-192.png',
-  './icon-512.png',
-  './icon-512-maskable.png',
-  'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js',
-  'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
-];
+/* ============================================================
+   sw.js - حاسبة الحصص ديوان الحليب
+   استراتيجية: الشبكة أولاً (Network-First)
+   - عند توفر الإنترنت: يحمّل النسخة الأحدث دائماً ويحدّث الكاش
+   - عند انقطاعه: يخدم آخر نسخة مخزنة (يعمل أوفلاين)
+   تحديث: تغيير رقم الإصدار أدناه يجبر الأجهزة على تحديث كاشها
+   ============================================================ */
+const CACHE_NAME = 'lots-calc-v20260821-v3';
 
-// عند التثبيت: خزّن الملفات الأساسية وفعّل النسخة الجديدة فورًا (بدون انتظار)
-self.addEventListener('install', (event) => {
+self.addEventListener('install', (e) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(FILES_TO_CACHE))
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(
+    caches.keys()
+      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim())
   );
 });
 
-// عند التفعيل: احذف أي نسخ كاش قديمة وتولَّ التحكم في الصفحة فورًا
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    caches.keys().then((keys) =>
-      Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+self.addEventListener('fetch', (e) => {
+  const req = e.request;
+  if (req.method !== 'GET') return;
+
+  // الشبكة أولاً
+  e.respondWith(
+    fetch(req)
+      .then((res) => {
+        try {
+          const copy = res.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+        } catch (err) {}
+        return res;
+      })
+      .catch(() =>
+        caches.match(req).then((m) => m || caches.match('./index.html'))
       )
-    ).then(() => self.clients.claim())
-  );
-});
-
-// استراتيجية: الكاش أولاً (العمل أوفلاين كلياً كأولوية)، ثم الشبكة إذا لم يكن الملف في الكاش.
-// إذا طلبنا تحديثاً، يمكننا الاعتماد على تخطي الكاش.
-self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
-
-  event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      // 1. Return cached response if we have it (OFFLINE FIRST)
-      if (cachedResponse) {
-        // Optionally fetch in background to update cache for next time (Stale-while-revalidate)
-        fetch(event.request).then((networkResponse) => {
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, networkResponse);
-          });
-        }).catch(() => {}); // ignore network errors in background
-        return cachedResponse;
-      }
-      
-      // 2. If not in cache, try network
-      return fetch(event.request).then((networkResponse) => {
-        const clone = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-        return networkResponse;
-      }).catch(() => {
-        // 3. If offline and not in cache, fallback to index.html (useful for PWA routing)
-        if (event.request.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
-      });
-    })
   );
 });
