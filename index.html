@@ -1673,8 +1673,9 @@ tr:hover {
         <div style="margin-bottom: 15px; text-align: right;">
           <h3 style="font-size: 14px; color: var(--fb-red); margin-bottom: 6px;"><i class="fa-solid fa-arrows-rotate"></i> سابعاً: ماذا تفعل إذا لم تظهر التحديثات الجديدة؟</h3>
           <div style="padding-right: 15px;">
-            <b>1.</b> اضغط على زر <b>"تحديث التطبيق ومسح الكاش"</b> في أدوات الربط والمزامنة (تبويب السجل والأدوات).<br>
-            <b>2.</b> وافق على التحديث؛ سيُمسح التخزين المؤقت وتظهر النسخة الأحدث دون حذف بياناتك.
+            <b>1.</b> التطبيق الجديد <b>يصلح نفسه تلقائياً</b>: عند أول فتح له يمسح الكاش والنسخ المخزنة ويعيد التحميل وحده - انتظر ثوانٍ فقط.<br>
+            <b>2.</b> إن لزم: اضغط زر <b>"تحديث التطبيق ومسح الكاش"</b> في أدوات الربط والمزامنة (تبويب السجل والأدوات) ووافق.<br>
+            <b>3.</b> بعد ذلك سيعمل التصدير Excel وPDF بدون إنترنت على جهازك.
           </div>
         </div>
       </div>
@@ -6969,7 +6970,57 @@ function installPWA() {
   }
 }
 
+// =============================================================
+// الإصلاح الذاتي للنسخة القديمة المخزنة (Self-Healing)
+// عند أول فتح لهذه النسخة: يمسح الكاش وService Worker تلقائياً
+// حتى لا يبقى الجهاز على نسخة قديمة تعتمد على الإنترنت في التصدير
+// =============================================================
+const APP_BUILD_VERSION = '2026-08-21-v3';
+function selfHealIfStale(){
+  try {
+    const prev = _safeStorage.getItem('app_build_version');
+    if(prev === APP_BUILD_VERSION) return; // نفس النسخة - لا حاجة
+    _safeStorage.setItem('app_build_version', APP_BUILD_VERSION);
+    const healed = _safeStorage.getItem('app_healed_' + APP_BUILD_VERSION);
+    if(healed === '1') return; // أُصلح سابقاً في هذه النسخة
+    _safeStorage.setItem('app_healed_' + APP_BUILD_VERSION, '1');
+    // مسح كل عمال الخدمة والكاش ثم إعادة تحميل
+    let pending = 0;
+    const done = () => { pending--; if(pending <= 0) finalize(); };
+    const finalize = () => {
+      try {
+        const isFile = (window.location.protocol === 'file:');
+        if(isFile){
+          window.location.reload();
+        } else {
+          window.location.href = window.location.href.split('#')[0] + (window.location.search ? '&' : '?') + 'v=' + Date.now();
+        }
+      } catch(e){}
+    };
+    if('serviceWorker' in navigator && navigator.serviceWorker){
+      try {
+        navigator.serviceWorker.getRegistrations().then(function(regs){
+          regs.forEach(function(r){ try{ r.unregister(); }catch(e){} });
+          done();
+        });
+        pending++;
+      } catch(e){ }
+    }
+    if('caches' in window && window.caches){
+      try {
+        caches.keys().then(function(names){
+          names.forEach(function(n){ try{ caches.delete(n); }catch(e){} });
+          done();
+        });
+        pending++;
+      } catch(e){ }
+    }
+    if(pending === 0) finalize();
+  } catch(e){}
+}
+
 // First critical render step immediately parsing scripts, to prevent white-screen delay.
+selfHealIfStale();
 renderAll();
 
 // Register Service Worker for strict Offline PWA support
@@ -7434,5 +7485,6 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb0604ed1ea0e6',t:'MTc4NzMyOTgzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb1c5fd891d07f',t:'MTc4NzMzMDc1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script type="module" src="https://static.cloudflareinsights.com/beacon.min.js/v4513226cdae34746b4dedf0b4dfa099e1781791509496" integrity="sha512-ZE9pZaUXND66v380QUtch/5sE9tPFh2zg45pR2PB0CVkCtOREv2AJKkSidISWkysEuQ0EH8faUU5du78bx87UQ==" data-cf-beacon='{"version":"2024.11.0","token":"1954b47c125f43f8b4338b3c4f804e4f"}' crossorigin="anonymous"></script>
+</body>
 </html>
