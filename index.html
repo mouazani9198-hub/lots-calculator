@@ -6100,6 +6100,7 @@ function analyzeAndMigrateLegacyTorn(files, opts){
 
     // إدخالات التسليم لا يُطبق عليها خصم الممزق أبداً
     f.deliveries.forEach(d => {
+      if(!d || typeof d !== 'object') return; // حماية من البيانات المدمرة
       (Array.isArray(d.entries) ? d.entries : []).forEach(e => {
         if(e && typeof e === 'object' && typeof e.deductTorn !== 'boolean') e.deductTorn = false;
       });
@@ -6286,13 +6287,19 @@ function restoreBackup(event) {
       const completeRestore = () => {
         saveFiles(files);
         if (logs) saveLogs(logs);
+        // عرض فوري للبيانات المسترجعة دون انتظار إعادة التحميل
+        renderAll();
         showAlertModal(
           `✅ <b>تم استرجاع النسخة الاحتياطية بنجاح وترحيل بياناتها:</b><br><br>` +
           (pending.length > 0 ? `<b>قرارات الخصم حسب اختيارك لكل ملف:</b><br>${tornDecisionSummaryText(files)}<br><br>` : '') +
           migrationExtraSummaryText(result),
           "اكتمل الاسترجاع", false
         );
-        setTimeout(() => window.location.reload(), 3000);
+        // إعادة تحميل خالية من الكاش (حتى لا يعيد المتصفح نسخة قديمة مخزنة)
+        setTimeout(() => {
+          try { window.location.href = window.location.origin + window.location.pathname + '?v=' + Date.now(); }
+          catch(e){ try { window.location.reload(); } catch(e2){} }
+        }, 3000);
       };
 
       if(pending.length > 0) {
@@ -6335,12 +6342,17 @@ function exportAllToExcelActual() {
   showToast("📊 جاري تصدير الحصص بصيغة Excel حقيقية...");
 
   const runExcelExport = () => {
+    const skippedFiles = []; // ملفات تالفة تُتخطى بأمان دون منع التصدير
+    const safeEachFile = (f, fn) => {
+      try { fn(f); }
+      catch(err){ skippedFiles.push((f && f.fileNumber) ? f.fileNumber : 'ملف غير معروف'); console.error('تخطى ملف تالف في التصدير:', f && f.fileNumber, err); }
+    };
     const list = loadFiles();
     const wb = XLSX.utils.book_new();
 
     // 1. Sheet 1: الملفات والمخازن (Files & Real Stock) - متسقة تماماً مع معادلة المخزون الموحدة
     let filesData = [];
-    list.forEach(f => {
+    list.forEach(f => safeEachFile(f, (f) => {
       const stocks = getFileRealStocks(f);
       const recTons = stocks.rec;
       const totalTornDeduction = stocks.torn;
@@ -6466,13 +6478,13 @@ function exportAllToExcelActual() {
           }
         });
       }
-    });
+    }));
     const wsFiles = XLSX.utils.json_to_sheet(filesData);
     XLSX.utils.book_append_sheet(wb, wsFiles, "حالة الملفات والمخازن");
 
     // 2. Sheet 2: مسيرة أرصدة الزبائن (Customer Balances)
     const customerData = [];
-    list.forEach(f => {
+    list.forEach(f => safeEachFile(f, (f) => {
       const pw = palletWeight(f);
       (f.deliveries || []).forEach(d => {
         let deliveredWeight = 0;
@@ -6492,7 +6504,7 @@ function exportAllToExcelActual() {
           "تابع لملف رقم": f.fileNumber
         });
       });
-    });
+    }));
     const wsCustomers = XLSX.utils.json_to_sheet(customerData);
     XLSX.utils.book_append_sheet(wb, wsCustomers, "مسيرة أرصدة العملاء");
 
@@ -6522,7 +6534,7 @@ function exportAllToExcelActual() {
         let typeOutputsSum = 0;
         let typeFinalSum = 0;
 
-        typeFiles.forEach(f => {
+        typeFiles.forEach(f => safeEachFile(f, (f) => {
           const pw = palletWeight(f);
           const bagW = (parseFloat(f.bagWeight) || 25) / 1000;
 
@@ -6624,7 +6636,7 @@ function exportAllToExcelActual() {
             "مخرجات الأسبوع (طن)": outputsOfWeek,
             "الكمية النهائية للملف ختام الأسبوع (طن)": finalQty
           });
-        });
+        }));
 
         // Append Total Row specifically for this powder type under this warehouse
         if (typeFiles.length > 0) {
@@ -6663,7 +6675,7 @@ function exportAllToExcelActual() {
     
     // 4. Sheet 4: تقرير التلف والأكياس الممزقة (Torn Bags Audit)
     const tornData = [];
-    list.forEach(f => {
+    list.forEach(f => safeEachFile(f, (f) => {
       let totalPF = 0;
       let totalPM = 0;
       let tornWeightDeduction = 0; // كل الممزق فعلياً (تقرير التلف المادي)
@@ -6706,7 +6718,7 @@ function exportAllToExcelActual() {
           "الوزن المخصوم فعلياً من الرصيد (طن)": deductedFromStock
         });
       }
-    });
+    }));
 
     if (tornData.length > 0) {
       const wsTorn = XLSX.utils.json_to_sheet(tornData);
@@ -6768,7 +6780,7 @@ function exportAllToExcelActual() {
 
     // Sheet 7: السجل التفصيلي لكل العمليات (أصغر معلومة للتسيير)
     const detailData = [];
-    list.forEach(f => {
+    list.forEach(f => safeEachFile(f, (f) => {
       const pw = palletWeight(f);
       ((f.receiving || {}).entries || []).forEach(e => {
         if(!e) return;
@@ -6847,7 +6859,7 @@ function exportAllToExcelActual() {
           "تاريخ العملية": new Date(a.ts).toLocaleString('ar-DZ')
         });
       });
-    });
+    }));
     if (detailData.length > 0) {
       const wsDetail = XLSX.utils.json_to_sheet(detailData);
       XLSX.utils.book_append_sheet(wb, wsDetail, "سجل الشحنات التفصيلي (كل العمليات)");
@@ -6855,7 +6867,7 @@ function exportAllToExcelActual() {
 
     // Sheet 8: سجل الوصولات المغلقة (وصلات الاستلام والتسليم المقفلة)
     const receiptsData = [];
-    list.forEach(f => {
+    list.forEach(f => safeEachFile(f, (f) => {
       (f.receivingCheckpoints || []).forEach(cp => {
         if(!cp) return;
         receiptsData.push({
@@ -6884,7 +6896,7 @@ function exportAllToExcelActual() {
           });
         });
       });
-    });
+    }));
     if (receiptsData.length > 0) {
       const wsReceipts = XLSX.utils.json_to_sheet(receiptsData);
       XLSX.utils.book_append_sheet(wb, wsReceipts, "سجل الوصولات المغلقة");
@@ -6898,6 +6910,9 @@ function exportAllToExcelActual() {
       XLSX.utils.book_append_sheet(wb, wsLogs, "سجل النشاطات");
     }
 
+    if(skippedFiles.length > 0){
+      showAlertModal("⚠️ <b>تم تخطي بعض الملفات التالفة أثناء التصدير:</b><br><br>" + skippedFiles.map(n => '• ' + n).join('<br>') + "<br><br>باقي الأوراق اكتملت بنجاح.");
+    }
     // توليد الملف كبايتات ثم تحميله بآلية موثوقة (تحميل تلقائي + رابط احتياطي ظاهر)
     try {
       const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
@@ -7419,5 +7434,5 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eae3de892c8f14',t:'MTc4NzMyODQ0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb0604ed1ea0e6',t:'MTc4NzMyOTgzOA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
