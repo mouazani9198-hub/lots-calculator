@@ -1290,6 +1290,7 @@ tr:hover {
     <!-- تبويب الممزق والخيارات -->
     <div class="card home-panel-torn" id="tornOptionsCard" style="display:none; border:2px solid #EAA800; background:rgba(234,168,0,0.05); margin-bottom:12px;">
       <h2><i class="fa-solid fa-box-open" style="color:#EAA800;"></i> 🧻 الأكياس الممزقة وخيارات الخصم (PF/PM)</h2>
+      <div id="approvedTornSummary" style="margin-bottom:10px;"></div>
       <!-- Added Option Switch to DEDUCT or NOT DEDUCT torn bags from net weight (إخفاء عند التسليم كلياً) -->
       <div class="switch-container" id="deductTornBagsCheckedContainer" style="margin-top: -6px;">
         <div class="switch-label">
@@ -2543,6 +2544,34 @@ function switchHomeTab(tab){
   updateEntrySummary();
 }
 
+// ملخص الخصومات المصادق عليها (تظهر دائماً حتى مع إيقاف المفتاح العام)
+function updateApprovedTornSummary(){
+  const elSummary = document.getElementById('approvedTornSummary');
+  if(!elSummary) return;
+  const file = getFile(currentFileId);
+  if(!file || currentMode !== 'receiving'){
+    elSummary.style.display = 'none';
+    return;
+  }
+  let tons = 0, bags = 0, entriesCount = 0;
+  (file.receiving?.entries || []).forEach(e => {
+    if(shouldDeductTorn(e)){
+      const t = calcTornTons(e, file);
+      if(t > 0){
+        tons += t;
+        bags += (parseFloat(e.pf) || 0) + (parseFloat(e.pm) || 0);
+        entriesCount++;
+      }
+    }
+  });
+  elSummary.style.display = 'block';
+  if(tons <= 0){
+    elSummary.innerHTML = '<div style="font-size:12px; color:var(--text-sec-current); background:rgba(0,0,0,0.04); padding:8px; border-radius:6px;">ℹ️ لا توجد خصومات مصادق عليها في هذا الملف بعد — المفتاح أعلاه يُطبَّق على الدفعات الجديدة فقط.</div>';
+    return;
+  }
+  elSummary.innerHTML = `<div style="font-size:12.5px; color:var(--fb-red); font-weight:800; background:rgba(250,62,62,0.08); border:1px dashed var(--fb-red); padding:8px; border-radius:6px;">✅ الخصومات المصادق عليها في هذا الملف: <b>${bags}</b> كيس بوزن <b>${formatTonsSmart(tons)}</b> طن في <b>${entriesCount}</b> دفعة — تظهر دائماً في كل الشاشات والوصلات حتى لو كان المفتاح أعلاه غير مفعّل (المفتاح يخص الدفعات الجديدة فقط).</div>`;
+}
+
 // ملخص الإدخال الحي (الشريط السفلي + فوق زر الحفظ)
 function updateEntrySummary(){
   const file = getFile(currentFileId);
@@ -3150,6 +3179,7 @@ function renderAll() {
     renderAdjustmentsList();
     calculateTonsToPallets();
     updateEntrySummary();
+    updateApprovedTornSummary();
   } else if(activeView === 'shipments') {
     renderFilesList();
   } else if(activeView === 'stock') {
@@ -4307,7 +4337,12 @@ function renderShipmentEntriesTable() {
   [...entries].reverse().forEach((e, originalIndex) => {
     // Use the unique timestamp instead of array index to prevent filtered array mismatch bugs
     const entryTs = e.ts;
-    const weightVal = e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
+    const grossW = e.bags ? (e.bags * parseFloat(file.bagWeight) / 1000) : pw;
+    // الخصم المعتمد يظهر دائماً على الصف (مصادق عليه سابقاً) بغض النظر عن المفتاح العام
+    const entryTornW = (isReceiving && shouldDeductTorn(e)) ? calcTornTons(e, file) : 0;
+    const weightCellHtml = entryTornW > 0.0001
+      ? `${formatTons(grossW)}<div style="font-size:10px; color:var(--fb-red); font-weight:bold;">خصم معتمد: -${formatTonsSmart(entryTornW)} طن</div><div style="font-size:10px; color:var(--fb-green); font-weight:bold;">الصافي: ${formatTons(grossW - entryTornW)} طن</div>`
+      : formatTons(grossW);
     const timeStr = new Date(e.ts).toLocaleTimeString('ar-DZ', {hour: '2-digit', minute:'2-digit', hour12: false});
 
     const row = document.createElement('tr');
@@ -4325,7 +4360,7 @@ function renderShipmentEntriesTable() {
       <td class="col-deduct-toggle" style="display:${isReceiving ? 'table-cell' : 'none'}; text-align:center;">
         <input type="checkbox" ${shouldDeductTorn(e) ? 'checked' : ''} onchange="toggleEntryDeduction(${entryTs}, this.checked)" style="width:18px; height:18px; accent-color: var(--fb-red); cursor:pointer;" title="تفعيل أو إلغاء خصم وزن الممزق لهذا السجل">
       </td>
-      <td>${formatTons(weightVal)}</td>
+      <td>${weightCellHtml}</td>
       <td>
         <button class="btn btn-danger" style="padding: 4px 8px; font-size:11px;" onclick="deleteEntry(${entryTs})">
           <i class="fa-solid fa-trash"></i>
@@ -4440,11 +4475,13 @@ function renderLotsSummaryLog() {
     (file.adjustments || []).forEach(a => { adjNetForLot += adjustmentNetForLot(a, file, lot); });
     const netWeight = Math.max(0, grossWeight - tornWeight + adjNetForLot);
     const adjNote = (Math.abs(adjNetForLot) > 0.0005) ? `<div style="font-size:10px; color:var(--fb-amber);">تسويات: ${adjNetForLot > 0 ? '+' : ''}${formatTonsSmart(adjNetForLot)} طن</div>` : '';
+    // الخصم المعتمد من الممزق يظهر دائماً (مصادق عليه سابقاً) حتى مع إيقاف المفتاح العام
+    const tornNote = (tornWeight > 0.0001) ? `<div style="font-size:10px; color:var(--fb-red);">الخصم المعتمد من الممزق: -${formatTonsSmart(tornWeight)} طن</div>` : '';
 
     const row = document.createElement('tr');
     row.innerHTML = `
       <td><b>${escapeHtml(lot)}</b></td>
-      <td>${item.pallets} منّصة ${item.looseBags > 0 ? '+ ' + item.looseBags + ' كيس' : ''}${adjNote}</td>
+      <td>${item.pallets} منّصة ${item.looseBags > 0 ? '+ ' + item.looseBags + ' كيس' : ''}${adjNote}${tornNote}</td>
       <td><span style="color:var(--fb-red);">${tornCount} كيس (${item.pf} PF / ${item.pm} PM)</span></td>
       <td><b>${formatTonsSmart(netWeight)} طن</b></td>
       <td>
@@ -5865,7 +5902,7 @@ function deleteCustomerConfirm(fileId, deliveryId) {
 // --- BACKUP, RESTORE AND SETTINGS TOOLS ---
 function triggerBackup() {
   const data = {
-    dataVersion: 2, // إصدار بنية البيانات الحالي (قرار خصم الممزق مسجل مع كل إدخال)
+    dataVersion: 3, // إصدار بنية البيانات (قرار الخصم + التسويات الميدانية محفوظة مع كل إدخال)
     files: loadFiles(),
     logs: loadLogs()
   };
@@ -6127,7 +6164,19 @@ function exportAllToExcelActual() {
       });
       
       const availableLots = Object.keys(lotMap).filter(lot => lotMap[lot] > 0.001);
-      
+
+      // بيانات تعريفية كاملة للملف (تظهر في كل صفوفه - أصغر معلومة مفيدة للتسيير)
+      const fileMeta = {
+        "اسم الباخرة": f.vessel || "—",
+        "تاريخ وصول الباخرة": f.arrivalDate || "—",
+        "تاريخ الإنتاج": f.productionDate || "—",
+        "تاريخ انتهاء الصلاحية": f.expiryDate || "—",
+        "عدد دفعات الاستلام": (f.receiving?.entries || []).length,
+        "عدد دفعات التسليم": (f.deliveries || []).reduce((s, d) => s + (d.entries || []).length, 0),
+        "عدد فحوصات المخبر": (f.labTests?.entries || f.labEntries || []).length,
+        "عدد التسويات الميدانية": (f.adjustments || []).length
+      };
+
       if (availableLots.length === 0) {
         filesData.push({
           "رقم الملف / BL": f.fileNumber,
@@ -6145,7 +6194,8 @@ function exportAllToExcelActual() {
           "تسويات إضافة (طن)": adjInTons,
           "تسويات خصم (طن)": adjOutTons,
           "المسلم الكلي (طن)": delTons,
-          "إجمالي الرصيد المتاح (طن)": remainingTons
+          "إجمالي الرصيد المتاح (طن)": remainingTons,
+          ...fileMeta
         });
       } else {
         availableLots.forEach((lot, index) => {
@@ -6166,7 +6216,8 @@ function exportAllToExcelActual() {
               "تسويات إضافة (طن)": adjInTons,
               "تسويات خصم (طن)": adjOutTons,
               "المسلم الكلي (طن)": delTons,
-              "إجمالي الرصيد المتاح (طن)": remainingTons
+              "إجمالي الرصيد المتاح (طن)": remainingTons,
+              ...fileMeta
             });
           } else {
             filesData.push({
@@ -6185,7 +6236,8 @@ function exportAllToExcelActual() {
               "تسويات إضافة (طن)": "",
               "تسويات خصم (طن)": "",
               "المسلم الكلي (طن)": "",
-              "إجمالي الرصيد المتاح (طن)": ""
+              "إجمالي الرصيد المتاح (طن)": "",
+              ...fileMeta
             });
           }
         });
@@ -6486,6 +6538,132 @@ function exportAllToExcelActual() {
       XLSX.utils.book_append_sheet(wb, wsAdj, "سجل التسويات الميدانية");
     }
 
+    // Sheet 7: السجل التفصيلي لكل العمليات (أصغر معلومة للتسيير)
+    const detailData = [];
+    list.forEach(f => {
+      const pw = palletWeight(f);
+      (f.receiving?.entries || []).forEach(e => {
+        const w = entryWeight(e, f);
+        const tornW = shouldDeductTorn(e) ? calcTornTons(e, f) : 0;
+        detailData.push({
+          "رقم الملف / BL": f.fileNumber,
+          "المستودع": f.warehouse || "سعيدة 1",
+          "نوع العملية": "استلام",
+          "رقم الحصة": e.lot || "—",
+          "الشاحنة": e.truck || "—",
+          "المنصات": e.bags ? 0 : 1,
+          "الأكياس السائبة": e.bags || 0,
+          "ممزق مورد PF": e.pf || 0,
+          "ممزق عامل PM": e.pm || 0,
+          "الوزن الإجمالي (طن)": w,
+          "الخصم المعتمد من الممزق (طن)": tornW,
+          "الصافي (طن)": Math.max(0, w - tornW),
+          "تاريخ العملية": new Date(e.ts).toLocaleString('ar-DZ')
+        });
+      });
+      (f.deliveries || []).forEach(d => {
+        (d.entries || []).forEach(e => {
+          detailData.push({
+            "رقم الملف / BL": f.fileNumber,
+            "المستودع": f.warehouse || "سعيدة 1",
+            "نوع العملية": "تسليم — " + (d.customerName || "—"),
+            "رقم الحصة": e.lot || "—",
+            "الشاحنة": e.truck || "—",
+            "المنصات": e.bags ? 0 : 1,
+            "الأكياس السائبة": e.bags || 0,
+            "ممزق مورد PF": 0,
+            "ممزق عامل PM": 0,
+            "الوزن الإجمالي (طن)": entryWeight(e, f),
+            "الخصم المعتمد من الممزق (طن)": 0,
+            "الصافي (طن)": entryWeight(e, f),
+            "تاريخ العملية": new Date(e.ts).toLocaleString('ar-DZ')
+          });
+        });
+      });
+      (f.labTests?.entries || f.labEntries || []).forEach(e => {
+        detailData.push({
+          "رقم الملف / BL": f.fileNumber,
+          "المستودع": f.warehouse || "سعيدة 1",
+          "نوع العملية": (e.type === 'out') ? "مخبر - إخراج" : "مخبر - إرجاع",
+          "رقم الحصة": e.lot || "—",
+          "الشاحنة": "مخبر",
+          "المنصات": e.bags ? 0 : 1,
+          "الأكياس السائبة": e.bags || 0,
+          "ممزق مورد PF": 0,
+          "ممزق عامل PM": 0,
+          "الوزن الإجمالي (طن)": entryWeight(e, f),
+          "الخصم المعتمد من الممزق (طن)": 0,
+          "الصافي (طن)": entryWeight(e, f),
+          "تاريخ العملية": new Date(e.ts).toLocaleString('ar-DZ')
+        });
+      });
+      (f.adjustments || []).forEach(a => {
+        const typeNames = { add: "زيادة", remove: "نقصان", torn: "تحويل لممزق", untorn: "إلغاء ممزق", move: "نقل بين حصص" };
+        detailData.push({
+          "رقم الملف / BL": f.fileNumber,
+          "المستودع": f.warehouse || "سعيدة 1",
+          "نوع العملية": "تسوية — " + (typeNames[a.type] || a.type),
+          "رقم الحصة": a.lot || "—",
+          "الشاحنة": a.toLot ? ("إلى حصة " + a.toLot) : "—",
+          "المنصات": a.pallets || 0,
+          "الأكياس السائبة": a.bags || 0,
+          "ممزق مورد PF": a.pf || 0,
+          "ممزق عامل PM": a.pm || 0,
+          "الوزن الإجمالي (طن)": adjustmentWeight(a, f),
+          "الخصم المعتمد من الممزق (طن)": 0,
+          "الصافي (طن)": adjustmentWeight(a, f),
+          "تاريخ العملية": new Date(a.ts).toLocaleString('ar-DZ')
+        });
+      });
+    });
+    if (detailData.length > 0) {
+      const wsDetail = XLSX.utils.json_to_sheet(detailData);
+      XLSX.utils.book_append_sheet(wb, wsDetail, "سجل الشحنات التفصيلي (كل العمليات)");
+    }
+
+    // Sheet 8: سجل الوصولات المغلقة (وصلات الاستلام والتسليم المقفلة)
+    const receiptsData = [];
+    list.forEach(f => {
+      (f.receivingCheckpoints || []).forEach(cp => {
+        receiptsData.push({
+          "رقم الملف / BL": f.fileNumber,
+          "المستودع": f.warehouse || "سعيدة 1",
+          "نوع الوصل": "وصل استلام",
+          "رقم الوصل": cp.seq || "—",
+          "الوزن الصافي المقفل (طن)": cp.tons || 0,
+          "تاريخ العمل الفعلي": cp.actualDate || "—",
+          "حالة خصم الممزق وقت الإغلاق": (cp.deductTorn === true) ? "مفعّل" : (cp.deductTorn === false) ? "غير مفعّل" : "غير مسجل",
+          "تاريخ الإغلاق": new Date(cp.ts).toLocaleString('ar-DZ')
+        });
+      });
+      (f.deliveries || []).forEach(d => {
+        (d.checkpoints || []).forEach(cp => {
+          receiptsData.push({
+            "رقم الملف / BL": f.fileNumber,
+            "المستودع": f.warehouse || "سعيدة 1",
+            "نوع الوصل": "سند خروج — " + (d.customerName || "—"),
+            "رقم الوصل": cp.seq || "—",
+            "الوزن الصافي المقفل (طن)": cp.tons || 0,
+            "تاريخ العمل الفعلي": cp.actualDate || "—",
+            "حالة خصم الممزق وقت الإغلاق": "—",
+            "تاريخ الإغلاق": new Date(cp.ts).toLocaleString('ar-DZ')
+          });
+        });
+      });
+    });
+    if (receiptsData.length > 0) {
+      const wsReceipts = XLSX.utils.json_to_sheet(receiptsData);
+      XLSX.utils.book_append_sheet(wb, wsReceipts, "سجل الوصولات المغلقة");
+    }
+
+    // Sheet 9: سجل النشاطات
+    const logsList = loadLogs();
+    if (logsList.length > 0) {
+      const logsData = logsList.map(l => ({ "الوقت": l.time, "النشاط": l.text }));
+      const wsLogs = XLSX.utils.json_to_sheet(logsData);
+      XLSX.utils.book_append_sheet(wb, wsLogs, "سجل النشاطات");
+    }
+
     XLSX.writeFile(wb, `تقرير_ERP_المستودعات_الشامل_${Date.now()}.xlsx`);
     showToast("💚 تم تصدير ملف Excel الشامل بنجاح!");
   };
@@ -6532,5 +6710,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea25bf5e509370',t:'MTc4NzMyMDY1Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea3acaeb2112c0',t:'MTc4NzMyMTUxNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
