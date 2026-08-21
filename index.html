@@ -1665,7 +1665,7 @@ tr:hover {
             • <b>استخراج نسخة احتياطية (JSON)</b>: من تبويب "السجل والأدوات" — النسخة الجديدة تحفظ قرار خصم الممزق مع كل دفعة.<br>
             • عند <b>استرجاع نسخة قديمة</b>، يستنتج النظام قرارات الخصم تلقائياً من سجل الأرشفة ويسألك عن الدفعات الغامضة قبل الحفظ.<br>
             • زر <b>"ترحيل بيانات نسخة قديمة (خصم الممزق)"</b> يعالج البيانات الحالية في أي وقت.<br>
-            • التطبيق يعمل <b>بدون إنترنت</b> (الأيقونات والخط مضمّنان داخل الملف). حفظ الوصل PDF وتصدير Excel يحتاجان إنترنت مؤقتاً فقط.
+            • التطبيق يعمل <b>بدون إنترنت بالكامل</b>: الأيقونات والخط ومكتبات Excel وPDF مضمّنة داخل الملف — التصدير والطباعة يعملان دون أي اتصال. إن لم يبدأ تحميل الملف تلقائياً على الهاتف، استخدم الرابط الأخضر في نافذة "تم تجهيز الملف".
           </div>
         </div>
 
@@ -2042,6 +2042,23 @@ tr:hover {
     </div>
     <div class="modal-footer" style="justify-content: center;">
       <button class="btn btn-secondary" onclick="document.getElementById('receiptsHistoryModal').classList.remove('active')">إغلاق النافذة</button>
+    </div>
+  </div>
+</div>
+
+<!-- --- DOWNLOAD FALLBACK MODAL (رابط تحميل احتياطي) --- -->
+<div id="downloadModal" class="modal-overlay">
+  <div class="modal-box" style="max-width: 480px;">
+    <div class="modal-header">
+      <i class="fa-solid fa-download" style="color: var(--fb-green); font-size: 22px;"></i>
+      <span>تم تجهيز الملف ✅</span>
+    </div>
+    <div class="modal-body" style="text-align: center; line-height: 1.8;">
+      <a id="downloadModalLink" href="#" download style="display:inline-block; background: var(--fb-green); color:#fff; padding: 14px 22px; border-radius: 10px; font-weight: 900; font-size: 14px; text-decoration: none; margin: 6px 0;">⬇️ تحميل الملف</a>
+      <div id="downloadModalName" style="font-size: 11px; opacity: 0.75;">إن لم يبدأ التحميل تلقائياً خلال لحظات، استخدم الزر الأخضر أعلاه.</div>
+    </div>
+    <div class="modal-footer" style="justify-content: center;">
+      <button class="btn btn-secondary" onclick="closeDownloadModal()">إغلاق</button>
     </div>
   </div>
 </div>
@@ -5483,8 +5500,15 @@ async function savePDFFromPiContent(filenamePrefix){
     }
     const offsetX = (pageWidth - imgWidth) / 2;
     pdf.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
-    pdf.save(`${filenamePrefix}_${Date.now()}.pdf`);
-    showToast('✅ تم بنجاح حفظ وطباعة وصل رسمي PDF مع الشعار المعتمد!');
+    // توليد الملف كبايتات ثم تحميله بآلية موثوقة (تحميل تلقائي + رابط احتياطي ظاهر)
+    try {
+      const pdfBlob = pdf.output('blob');
+      downloadBlob(pdfBlob, `${filenamePrefix}_${Date.now()}.pdf`);
+      showToast('✅ تم بنجاح حفظ وطباعة وصل رسمي PDF مع الشعار المعتمد!');
+    } catch(err){
+      console.error(err);
+      showAlertModal("⚠️ <b>تعذر توليد ملف PDF:</b><br><br>" + (err && err.message ? err.message : String(err)));
+    }
   } catch(e) {
     console.error(e);
     showToast('⚠️ حدث خطأ أثناء إنشاء الوصل PDF');
@@ -5752,6 +5776,45 @@ function printCurrentStatus() {
 }
 
 // -------------------------------------------------------------
+// =============================================================
+// آلية تحميل موثوقة: تحميل تلقائي + رابط احتياطي ظاهر إن منعه المتصفح
+// =============================================================
+function downloadBlob(blob, filename){
+  try {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    // رابط احتياطي دائماً: بعض المتصفحات (خاصة على الهاتف) تمنع التحميل التلقائي
+    showDownloadFallback(url, filename);
+    setTimeout(() => { try{ document.body.removeChild(a); }catch(e){} try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
+    return true;
+  } catch(err){
+    console.error(err);
+    showAlertModal("⚠️ <b>تعذر بدء تحميل الملف تلقائياً:</b><br><br>" + (err && err.message ? err.message : String(err)) + "<br><br>تأكد من استخدام النسخة الرسمية المحدثة وليس معاينة داخل إطار مقيد.");
+    return false;
+  }
+}
+
+function showDownloadFallback(url, filename){
+  const modal = document.getElementById('downloadModal');
+  const link = document.getElementById('downloadModalLink');
+  const nameEl = document.getElementById('downloadModalName');
+  if(!modal || !link) return;
+  link.href = url;
+  link.setAttribute('download', filename);
+  link.textContent = '⬇️ اضغط هنا لتحميل: ' + filename;
+  if(nameEl) nameEl.textContent = 'إن لم يبدأ التحميل تلقائياً خلال لحظات، استخدم الزر الأخضر أعلاه.';
+  modal.classList.add('active');
+}
+
+function closeDownloadModal(){
+  const modal = document.getElementById('downloadModal');
+  if(modal) modal.classList.remove('active');
+}
+
 // --- FORCE APP UPDATE & CLEAR CACHE ---
 function forceAppUpdate() {
   if (confirm("🔄 هل تريد تحديث التطبيق ومسح التخزين المؤقت وحل مشكلة عدم ظهور التعديلات الجديدة؟ سيقوم هذا بتحديث كافة الشاشات والوصولات فوراً دون حذف ملفاتك.")) {
@@ -6835,8 +6898,16 @@ function exportAllToExcelActual() {
       XLSX.utils.book_append_sheet(wb, wsLogs, "سجل النشاطات");
     }
 
-    XLSX.writeFile(wb, `تقرير_ERP_المستودعات_الشامل_${Date.now()}.xlsx`);
-    showToast("💚 تم تصدير ملف Excel الشامل بنجاح!");
+    // توليد الملف كبايتات ثم تحميله بآلية موثوقة (تحميل تلقائي + رابط احتياطي ظاهر)
+    try {
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      downloadBlob(blob, `تقرير_ERP_المستودعات_الشامل_${Date.now()}.xlsx`);
+      showToast("💚 تم إنشاء ملف Excel الشامل - إن لم يبدأ التحميل تلقائياً استخدم الرابط الأخضر في النافذة");
+    } catch(err){
+      console.error(err);
+      showAlertModal("⚠️ <b>تعذر توليد ملف Excel:</b><br><br>" + (err && err.message ? err.message : String(err)));
+    }
   };
 
   // المكتبة مضمّنة داخل الملف (تعمل بدون إنترنت) - مع بديل CDN احتياطي ورسائل خطأ واضحة
@@ -7348,5 +7419,5 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eaa908dccf1d83',t:'MTc4NzMyNjAzMA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eae3de892c8f14',t:'MTc4NzMyODQ0MA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
