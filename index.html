@@ -4390,6 +4390,35 @@ function toggleEntryDeduction(ts, checked) {
   renderAll();
 }
 
+// ضبط خصم الممزق لكل دفعات ملف واحد دفعة واحدة (إصلاح ما ورثته النسخة القديمة)
+function toggleFileDeduct(fileId){
+  const file = getFile(fileId);
+  if(!file){
+    showToast("⚠️ الملف غير موجود!");
+    return;
+  }
+  const tornEntries = (file.receiving?.entries || []).filter(e => (parseFloat(e.pf) || 0) + (parseFloat(e.pm) || 0) > 0);
+  if(tornEntries.length === 0){
+    showToast("ℹ️ لا توجد دفعات بأكياس ممزقة في هذا الملف!");
+    return;
+  }
+  const approved = tornEntries.filter(e => shouldDeductTorn(e)).length;
+  const tornTons = tornEntries.reduce((s, e) => s + calcTornTons(e, file), 0);
+  const actionTxt = (approved > 0) ? "إلغاء الخصم" : "تفعيل الخصم";
+  askConfirmation(() => {
+    updateFile(fileId, f => {
+      (f.receiving?.entries || []).forEach(e => {
+        if((parseFloat(e.pf) || 0) + (parseFloat(e.pm) || 0) > 0){
+          e.deductTorn = (approved === 0); // لا معتمد → فعّل الكل، يوجد معتمد → ألغِ الكل
+        }
+      });
+    });
+    addLog(`⚙️ ${actionTxt} عن كل دفعات الملف ${escapeHtml(file.fileNumber)} (${tornEntries.length} دفعة بوزن ${formatTonsSmart(tornTons)} طن)`);
+    showToast(`✅ تم ${actionTxt} عن كل دفعات الملف!`);
+    renderAll();
+  }, `⚙️ <b>${actionTxt} عن كل دفعات الملف "${escapeHtml(file.fileNumber)}":</b><br><br>الدفعات المحتوية أكياساً ممزقة: <b>${tornEntries.length}</b><br>وزنها الممزق الكلي: <b>${formatTonsSmart(tornTons)} طن</b><br>المعتمد منها حالياً: <b>${approved}</b> دفعة<br><br>هل تريد ${actionTxt} عن جميعها دفعة واحدة؟<br><span style="font-size:11px;">(يمكنك تخصيص كل دفعة لاحقاً من عمود "خصم الممزق" في جدول سجل الشحنات)</span>`);
+}
+
 function updateIndividualTornBag(ts, type, val) {
   const intVal = parseInt(val) || 0;
   updateFile(currentFileId, f => {
@@ -4689,6 +4718,11 @@ function renderFilesList() {
       <div style="border-top: 1px dashed var(--border-current); padding-top: 8px;">
         <div style="font-size:11px; font-weight:bold; margin-bottom: 4px; color:var(--text-current);">تفصيل الحصص الحقيقية المتوفرة وكميتها:</div>
         <div>${lotsHtml}</div>
+      </div>
+      <div style="margin-top:8px; text-align:left;">
+        <button class="btn btn-secondary" style="padding:4px 10px; font-size:11px; margin:0;" onclick="toggleFileDeduct('${f.id}')" title="تفعيل أو إلغاء خصم وزن الممزق لكل دفعات هذا الملف دفعة واحدة">
+          <i class="fa-solid fa-box-open"></i> ضبط خصم الممزق لكل دفعات الملف
+        </button>
       </div>
     `;
     container.appendChild(card);
@@ -5968,6 +6002,18 @@ function analyzeAndMigrateLegacyTorn(files){
   return result;
 }
 
+// تفصيل الدفعات الغامضة حسب الملف (حتى يرى المستخدم أي ملف سيتأثر قبل القرار)
+function ambigBreakdownHtml(result){
+  const byFile = {};
+  result.ambiguous.forEach(a => {
+    const key = (a.file && a.file.fileNumber) ? a.file.fileNumber : 'ملف غير معروف';
+    if(!byFile[key]) byFile[key] = { count: 0, tons: 0 };
+    byFile[key].count++;
+    byFile[key].tons += calcTornTons(a.entry, a.file);
+  });
+  return Object.keys(byFile).map(k => `• ملف <b>${escapeHtml(k)}</b>: ${byFile[k].count} دفعة (${formatTonsSmart(byFile[k].tons)} طن)`).join('<br>');
+}
+
 function ambiguousTornWeight(list){
   let w = 0;
   list.forEach(a => { w += calcTornTons(a.entry, a.file); });
@@ -6015,7 +6061,7 @@ function runLegacyMigrationTool(){
   if(ambCount > 0) {
     askConfirmation(
       () => finish(true),
-      `🔄 <b>ترحيل بيانات النسخة القديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة من سجل أرشفتها.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) لكن حالة خصمها لم تكن مسجلة في النسخة القديمة — إجمالي وزن ممزقها <b>${formatTons(ambWeight)} طن</b>.<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟ (يمكنك تعديل أي دفعة لاحقاً من عمود "خصم الممزق" في الجدول)`,
+      `🔄 <b>ترحيل بيانات النسخة القديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة من سجل أرشفتها.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) لكن حالة خصمها لم تكن مسجلة في النسخة القديمة — إجمالي وزن ممزقها <b>${formatTons(ambWeight)} طن</b>.<br><br><b>تفصيلها حسب الملف:</b><br>${ambigBreakdownHtml(result)}<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟ (يمكنك تعديل أي دفعة لاحقاً من عمود "خصم الممزق" في الجدول)`,
       '',
       () => finish(false)
     );
@@ -6067,7 +6113,7 @@ function restoreBackup(event) {
       if(ambCount > 0) {
         askConfirmation(
           () => completeRestore(true),
-          `🔄 <b>ترحيل نسخة احتياطية قديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) بوزن إجمالي <b>${formatTons(ambWeight)} طن</b> لكن حالتها غير مسجلة في النسخة القديمة.<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟`,
+          `🔄 <b>ترحيل نسخة احتياطية قديمة:</b><br><br>تم استنتاج قرارات الخصم بدقة لـ <b>${result.fromCheckpoints}</b> دفعة مؤرشفة.<br><br>توجد أيضاً <b>${ambCount}</b> دفعة تحتوي أكياساً ممزقة (PF/PM) بوزن إجمالي <b>${formatTons(ambWeight)} طن</b> لكن حالتها غير مسجلة في النسخة القديمة.<br><br><b>تفصيلها حسب الملف:</b><br>${ambigBreakdownHtml(result)}<br><br>هل تريد تفعيل خصم وزنها من الرصيد؟`,
           '',
           () => completeRestore(false)
         );
@@ -6710,5 +6756,5 @@ if ('serviceWorker' in navigator) {
   });
 }
 </script>
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea3acaeb2112c0',t:'MTc4NzMyMTUxNA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2ea4ee15ea2a4a7',t:'MTc4NzMyMjMzNw=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
