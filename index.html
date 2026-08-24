@@ -121,6 +121,36 @@ body {
   transition: background-color 0.3s ease, border-color 0.3s ease;
 }
 
+/* شارة رقم التحديث وتاريخه - أعلى يمين شريط العنوان */
+.fb-version-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 900;
+  line-height: 1;
+  background: var(--fb-green);
+  color: #fff;
+  padding: 3px 8px;
+  border-radius: 999px;
+  margin-inline-start: 6px;
+  vertical-align: middle;
+  white-space: nowrap;
+  box-shadow: 0 1px 3px rgba(51, 181, 108, .45);
+  direction: ltr;               /* الأرقام لاتينية: تمنع إعادة ترتيبها داخل RTL */
+  unicode-bidi: isolate;
+}
+.fb-version-chip i { font-size: 9px; opacity: .9; }
+.fb-version-chip .fb-version-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding-inline-start: 5px;
+  border-inline-start: 1px solid rgba(255, 255, 255, .45);
+  font-weight: 700;
+  opacity: .95;
+}
+
 .fb-brand {
   display: flex;
   align-items: center;
@@ -918,6 +948,16 @@ tr:hover {
     gap: 4px;
   }
 
+  /* على الشاشات الضيقة يبقى رقم التحديث ظاهراً ويُخفى التاريخ */
+  .fb-version-chip {
+    font-size: 9px;
+    padding: 2px 6px;
+    gap: 4px;
+  }
+  .fb-version-chip .fb-version-date {
+    display: none;
+  }
+
   .circle-btn {
     width: 32px;
     height: 32px;
@@ -941,6 +981,13 @@ tr:hover {
     color: #000000 !important;
   }
   body * {
+    visibility: hidden !important;
+  }
+  /* إخفاء كامل للأشرطة الثابتة والتنبيهات والنوافذ عند الطباعة
+     حتى لا يُطبع أي عنصر من الواجهة فوق الوصل أو بدل جزء منه */
+  #toastNotification, .toast-wrap, .modal-overlay,
+  .fb-navbar, .fb-floating-bar, #floatingBottomBar, .home-tabs-bar {
+    display: none !important;
     visibility: hidden !important;
   }
   #printInvoice, #printInvoice * {
@@ -1038,7 +1085,11 @@ tr:hover {
 <nav class="fb-navbar">
   <a href="#" class="fb-brand" onclick="switchView('home'); return false;" title="الرئيسية">
     <i class="fa-solid fa-calculator" style="font-size: 24px;"></i>
-    <span id="appVersionBadge" style="font-size:9px; font-weight:900; background:var(--fb-green); color:#fff; padding:1px 6px; border-radius:8px; margin-inline-start:6px; vertical-align:super;">—</span>
+    <!-- رقم التحديث + تاريخه (أعلى يمين الشاشة) -->
+    <span id="appVersionBadge" class="fb-version-chip" dir="ltr">
+      <i class="fa-solid fa-code-branch"></i><b id="appVersionNumber">—</b>
+      <span class="fb-version-date"><i class="fa-solid fa-calendar-day"></i><span id="appVersionDate">—</span></span>
+    </span>
   </a>
   
   <div style="display: flex; gap: 5px; margin-right: 5px;">
@@ -1645,9 +1696,9 @@ tr:hover {
           <h3 style="font-size: 14px; color: var(--fb-green); margin-bottom: 6px;"><i class="fa-solid fa-user-shield"></i> رابعاً: كيف يتحقق عون الأمن من السند في البوابة؟</h3>
           <div style="padding-right: 15px;">
             <b>1.</b> يفتح عون الأمن <b>"درع الحماية 🛡️"</b> في تطبيقه.<br>
-            <b>2.</b> يقرأ السند المطبوع ويكتب: رقم الملف، رقم الوصل، <b>الوزن الصافي كما هو مطبوع بالضبط (خانتان عشريتان، مثال 21,38)</b>، والتاريخ.<br>
+            <b>2.</b> يقرأ السند المطبوع ويكتب: رقم الملف، رقم الوصل، <b>الوزن الصافي كما هو مطبوع بالضبط (3 خانات عشرية، مثال 21,385)</b>، والتاريخ.<br>
             <b>3.</b> يطابق الرمز الأخضر الناتج مع الرمز المطبوع أسفل الورقة.<br>
-            <b>4.</b> التطابق = الورقة أصلية ويُسمح بالمرور. (تحديث مهم: الرمز يُحسب الآن على الوزن بخانتين تماماً كما هو مطبوع — فلا إنذارات خاطئة)
+            <b>4.</b> التطابق = الورقة أصلية ويُسمح بالمرور. (الرمز يُحسب على الوزن بثلاث خانات تماماً كما هو مطبوع — فلا إنذارات خاطئة)
           </div>
         </div>
 
@@ -1657,7 +1708,7 @@ tr:hover {
           <div style="padding-right: 15px;">
             تبويب <b>"تسويات"</b> يغطي حوادث الميدان: <b>زيادة / نقصان / تحويل لممزق / إلغاء ممزق / نقل بين حصص</b>.<br>
             • الإدخال <b>بالكيلوغرام</b> (حتى 300غ = 0.3) مع أزرار اختصار (300غ / رطل / 1 / 5 / 10 كغ) ومحول حي يعرض المعادل بالطن والأرطال.<br>
-            • <b>الرطل = 0.5 كغ</b> = 0.0005 طن. <b>مبدأ الحساب: إنقاص 10 كغ من 500 طن = 499.99 طن</b> (العرض بخانتين عشريتين).<br>
+            • <b>الرطل = 0.5 كغ</b> = 0.0005 طن. <b>مبدأ الحساب: إنقاص 10 كغ من 500 طن = 499.99 طن</b> (العرض بثلاث خانات عشرية بدقة الجرام).<br>
             • السبب والتاريخ إلزاميان للتوثيق، ولا يُسمح بخصم أكثر من رصيد الحصة، والوصلات المطبوعة لا تتغير.<br>
             • التعديل يظهر فوراً في: الشريط العلوي، العدادات، ملخص الحصص، قائمة الملفات، البحث، الاقتراحات، وتصدير Excel.
           </div>
@@ -1991,7 +2042,9 @@ tr:hover {
         </div>
         <div class="field">
           <label style="font-size: 12px; font-weight: bold; color: var(--text-current);">3. الوزن الصافي الكلي بالطن (المكتوب في السند)</label>
-          <input type="number" id="auditNetWeight" step="0.001" placeholder="مثال: 21.000" oninput="runSecurityAuditVerifier()" style="font-size: 18px; padding: 12px; font-weight: 900; border-color: var(--fb-green); color: var(--fb-green);">
+          <!-- type=text (وليس number): الوصل يطبع الوزن بفاصلة عشرية (21,385) وحقل number
+               يرفض الفاصلة فيفرغ تماماً ويظهر "بانتظار إدخال البيانات" رغم أن العون كتب الرقم صحيحاً -->
+          <input type="text" inputmode="decimal" autocomplete="off" id="auditNetWeight" placeholder="مثال: 21,385 أو 21.385" oninput="runSecurityAuditVerifier()" style="font-size: 18px; padding: 12px; font-weight: 900; border-color: var(--fb-green); color: var(--fb-green); direction: ltr; text-align: left;">
         </div>
         <div class="field">
           <label style="font-size: 12px; font-weight: bold; color: var(--text-current);">4. تاريخ السند المدون بالورقة</label>
@@ -2005,7 +2058,7 @@ tr:hover {
           — بانتظار إدخال البيانات للتحقق —
         </div>
         <div style="font-size: 11px; opacity: 0.7; margin-top: 4px; color: var(--text-current);">
-          💡 اكتب الوزن <b>كما هو مطبوع على الوصل بالضبط</b> (بخانتين عشريتين، مثال: 21,38). إذا تطابق هذا الرمز تماماً مع الرمز المطبوع أسفل ورقة السائق، فإن الشحنة والوزن سليمين 100% ومصادق عليهما رسمياً من المخزن.
+          💡 اكتب الوزن <b>كما هو مطبوع على الوصل بالضبط</b> (بثلاث خانات عشرية، مثال: 21,385). إذا تطابق هذا الرمز تماماً مع الرمز المطبوع أسفل ورقة السائق، فإن الشحنة والوزن سليمين 100% ومصادق عليهما رسمياً من المخزن.
         </div>
       </div>
     </div>
@@ -2063,7 +2116,8 @@ tr:hover {
       <a id="downloadModalLink" href="#" download style="display:inline-block; background: var(--fb-green); color:#fff; padding: 14px 22px; border-radius: 10px; font-weight: 900; font-size: 14px; text-decoration: none; margin: 6px 0;">⬇️ تحميل الملف</a>
       <div id="downloadModalName" style="font-size: 11px; opacity: 0.75;">إن لم يبدأ التحميل تلقائياً خلال لحظات، استخدم الزر الأخضر أعلاه.</div>
     </div>
-    <div class="modal-footer" style="justify-content: center;">
+    <div class="modal-footer" style="justify-content: center; flex-wrap: wrap;">
+      <button class="btn btn-secondary" onclick="retryLastDownload()"><i class="fa-solid fa-rotate"></i> إعادة محاولة التحميل</button>
       <button class="btn btn-secondary" onclick="closeDownloadModal()">إغلاق</button>
     </div>
   </div>
@@ -2421,10 +2475,24 @@ function addLog(text){
 
 function genId(){ return 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2,8); }
 function roundTo3(v){ return Math.round((parseFloat(v)||0)*1000)/1000; }
+// =============================================================
+// دقّة الأوزان الموحّدة: 3 خانات عشرية (مثال 21.385 طن = دقة الجرام)
+// كل عرض وتخزين وحساب للأوزان يمر عبر هذه الثوابت لضمان الاتساق
+// بين الوصل المطبوع، الرمز الأمني، Excel، وأداة التحقق.
+// =============================================================
+const WEIGHT_DECIMALS = 3;
+// تقريب نصف-الأعلى لعدد الخانات المطلوب (آمن مع السوالب)
+function roundTons(x, dec = WEIGHT_DECIMALS){
+  const n = parseFloat(x);
+  if(!isFinite(n)) return 0;
+  const f = Math.pow(10, dec);
+  const sign = n < 0 ? -1 : 1;
+  return sign * Math.floor(Math.abs(n) * f + 0.5) / f;
+}
 function formatTons(v){
-  // مبدأ الحساب الجديد: خانتان عشريتان (499.99 طن)
-  const r = Math.round((parseFloat(v) || 0) * 100) / 100;
-  return r.toLocaleString('fr-FR', {minimumFractionDigits:2, maximumFractionDigits:2});
+  // 3 خانات عشرية (21,385 طن) - دقة الجرام لتفادي إنذارات أعوان الأمن
+  const r = roundTons(v);
+  return r.toLocaleString('fr-FR', {minimumFractionDigits:WEIGHT_DECIMALS, maximumFractionDigits:WEIGHT_DECIMALS});
 }
 // تنسيق ذكي: 4 خانات عشرية للكميات الصغيرة دون 0.01 طن (دقة الرطل = 0.5 كغ = 0.0005 طن و 300غ = 0.0003 طن)
 function formatTonsSmart(v){
@@ -2669,9 +2737,23 @@ function closeConfirmModal(accepted) {
   const cancelToExecute = confirmCancelAction;
   confirmCancelAction = null;
   if(accepted && actionToExecute) {
-    actionToExecute();
+    try {
+      // الإجراءات هنا غالباً async: يجب التقاط الخطأ وإظهاره، وإلا يفشل الإجراء بصمت
+      // (هذا ما كان يحدث عند إغلاق الدفعة: ReferenceError يُبتلع ولا يُطبع أي PDF)
+      const maybePromise = actionToExecute();
+      if(maybePromise && typeof maybePromise.catch === 'function') {
+        maybePromise.catch(err => {
+          console.error('Action failed:', err);
+          try { addLog('❌ فشل تنفيذ الإجراء: ' + (err && err.message ? err.message : String(err))); } catch(e){}
+          showAlertModal('⚠️ <b>فشل تنفيذ الإجراء:</b><br><br>' + (err && err.message ? err.message : String(err)) + '<br><br><span style=\"font-size:12px;\">لم يتم إغلاق الدفعة أو توليد الوصل. أعد المحاولة، وإن تكرر الخطأ أرسل هذه الرسالة للدعم التقني.</span>');
+        });
+      }
+    } catch(err) {
+      console.error('Action failed:', err);
+      showAlertModal('⚠️ <b>فشل تنفيذ الإجراء:</b><br><br>' + (err && err.message ? err.message : String(err)));
+    }
   } else if(!accepted && cancelToExecute) {
-    cancelToExecute();
+    try { cancelToExecute(); } catch(err) { console.error(err); }
   }
 }
 
@@ -4310,12 +4392,12 @@ function archiveCurrentBatch() {
     updateFile(currentFileId, f => {
       if(currentMode === 'receiving') {
         f.receivingCheckpoints = f.receivingCheckpoints || [];
-        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, bagWeight: f.bagWeight, bagsPerPallet: f.bagsPerPallet, deductTorn: deductTornBagsChecked });
+        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: roundTons(calculatedTotal), bagWeight: f.bagWeight, bagsPerPallet: f.bagsPerPallet, deductTorn: deductTornBagsChecked });
       } else {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
         if(d) {
           d.checkpoints = d.checkpoints || [];
-          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, bagWeight: f.bagWeight, bagsPerPallet: f.bagsPerPallet });
+          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: roundTons(calculatedTotal), bagWeight: f.bagWeight, bagsPerPallet: f.bagsPerPallet });
         }
       }
     });
@@ -5492,27 +5574,98 @@ async function savePDFFromPiContent(filenamePrefix){
 
   try {
     const target = document.getElementById('piContent');
-    const canvas = await window.html2canvas(target, { scale: 2, backgroundColor: '#ffffff', useCORS: true });
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const canvas = await window.html2canvas(target, {
+      scale: 2,
+      backgroundColor: '#ffffff',
+      useCORS: true,
+      logging: false,
+      // الوصل عرضه ثابت 794px: على شاشات الهاتف الضيقة يجب رسمه بهذا العرض وإلا يُقتطع/يُشوَّه
+      windowWidth: Math.max(794, document.documentElement.clientWidth || 0),
+      width: 794
+    });
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF('p', 'mm', 'a4');
     const pageWidth = pdf.internal.pageSize.getWidth();
     const pageHeight = pdf.internal.pageSize.getHeight();
+
+    if(!canvas || !canvas.width || !canvas.height) throw new Error('تعذر رسم الوصل (Canvas فارغ)');
+
+    // عدد صفحات الصورة لو رُسمت بعرض A4 الكامل (بدون أي تصغير)
     const naturalImgHeight = (canvas.height * pageWidth) / canvas.width;
-    
-    let imgWidth = pageWidth, imgHeight = naturalImgHeight;
-    if(naturalImgHeight > pageHeight){
-      const scale = pageHeight / naturalImgHeight;
-      imgHeight = pageHeight;
-      imgWidth = pageWidth * scale;
+    const pageCount = Math.max(1, Math.ceil(naturalImgHeight / pageHeight - 0.001));
+
+    if(pageCount === 1){
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, naturalImgHeight);
+    } else {
+      // ⚠️ إصلاح: كان الوصل الطويل يُصغَّر كله داخل صفحة واحدة فتصبح الأرقام
+      // (رقم الوصل، رقم الملف، الرمز الأمني) غير مقروءة عند الطباعة.
+      // الآن يُقسَّم إلى صفحات A4 متتالية بنفس المقياس الحقيقي، مع البحث عن
+      // "سطر فارغ" قريب من موضع القطع حتى لا تُشق كلمة أو رقم بين صفحتين.
+      const pxPerMm = canvas.width / pageWidth;
+      const sliceFull = Math.floor(pageHeight * pxPerMm);
+
+      const blankRowScore = (y) => {
+        let ctx;
+        try { ctx = canvas.getContext('2d', { willReadFrequently: true }); } catch(e){ return 0; }
+        if(!ctx) return 0;
+        let data;
+        try { data = ctx.getImageData(0, y, canvas.width, 1).data; } catch(e){ return 1; }
+        let ink = 0;
+        for(let x = 0; x < data.length; x += 4){
+          if(data[x] < 245 || data[x+1] < 245 || data[x+2] < 245) ink++;
+        }
+        return ink / (data.length / 4); // نسبة الحبر في هذا السطر (0 = فارغ تماماً)
+      };
+
+      const findBreak = (wanted) => {
+        if(wanted >= canvas.height) return canvas.height;
+        const margin = Math.floor(sliceFull * 0.16);
+        let bestY = wanted, bestScore = Infinity;
+        for(let y = wanted; y > wanted - margin; y -= 2){
+          if(y <= 0) break;
+          const sc = blankRowScore(y);
+          if(sc < bestScore){ bestScore = sc; bestY = y; }
+          if(sc === 0) break; // سطر فارغ تماماً: أفضل موضع قطع
+        }
+        return Math.max(1, bestY);
+      };
+
+      let y = 0, pageIdx = 0;
+      while(y < canvas.height){
+        const isLast = (canvas.height - y) <= sliceFull;
+        const h = isLast ? (canvas.height - y) : (findBreak(y + sliceFull) - y);
+        if(h <= 0) break;
+
+        const pageCanvas = document.createElement('canvas');
+        pageCanvas.width = canvas.width;
+        pageCanvas.height = h;
+        const pctx = pageCanvas.getContext('2d');
+        pctx.fillStyle = '#ffffff';
+        pctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
+        pctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+
+        const mmH = (h * pageWidth) / canvas.width;
+        if(pageIdx > 0) pdf.addPage('a4', 'p');
+        pdf.addImage(pageCanvas.toDataURL('image/jpeg', 0.95), 'JPEG', 0, 0, pageWidth, mmH);
+
+        // ترقيم الصفحات حتى يعرف القارئ أن الوصل متعدد الصفحات
+        pdf.setFontSize(9);
+        pdf.setTextColor(90);
+        pdf.text(`صفحة ${pageIdx + 1} / ${pageCount}`, pageWidth / 2, pageHeight - 5, { align: 'center' });
+
+        y += h;
+        pageIdx++;
+        if(pageIdx > 60) break; // حد أمان ضد أي حلقة غير متوقعة
+      }
     }
-    const offsetX = (pageWidth - imgWidth) / 2;
-    pdf.addImage(imgData, 'JPEG', offsetX, 0, imgWidth, imgHeight);
+
     // توليد الملف كبايتات ثم تحميله بآلية موثوقة (تحميل تلقائي + رابط احتياطي ظاهر)
     try {
       const pdfBlob = pdf.output('blob');
-      downloadBlob(pdfBlob, `${filenamePrefix}_${Date.now()}.pdf`);
-      showToast('✅ تم بنجاح حفظ وطباعة وصل رسمي PDF مع الشعار المعتمد!');
+      const suffix = (pdf.internal.getNumberOfPages() > 1) ? `_من${pdf.internal.getNumberOfPages()}صفحات` : '';
+      downloadBlob(pdfBlob, `${filenamePrefix}${suffix}_${Date.now()}.pdf`);
+      showToast('✅ تم بنجاح حفظ وطباعة وصل رسمي PDF مع الشعار المعتمد!' +
+        (pdf.internal.getNumberOfPages() > 1 ? ` (${pdf.internal.getNumberOfPages()} صفحات)` : ''));
     } catch(err){
       console.error(err);
       showAlertModal("⚠️ <b>تعذر توليد ملف PDF:</b><br><br>" + (err && err.message ? err.message : String(err)));
@@ -5585,11 +5738,13 @@ async function closeBatchAndPrint() {
     }
 
     // Build finalized non-draft printed HTML
-    document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, entries, title, formattedSeq, false, actualFieldDate);
+    // ملاحظة: المتغيّر المحلي هنا اسمه currentSessionEntries (وليس entries) - استخدام entries كان يسبب
+    // ReferenceError صامتاً يُوقف كل ما بعده (لا PDF، لا قفل للدفعة، لا زيادة للرقم المتسلسل)
+    document.getElementById('piContent').innerHTML = buildInvoiceReceiptHTML(file, currentSessionEntries, title, formattedSeq, false, actualFieldDate);
     
     // Generate QR Code inside piContent specifically for the printed invoice
     const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, calculatedTotal, actualFieldDate);
-    const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${(Math.round(calculatedTotal * 100) / 100).toFixed(2)} | Hash: ${hash}`;
+    const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${roundTons(calculatedTotal).toFixed(WEIGHT_DECIMALS)} | Hash: ${hash}`;
     try {
       new QRCode(document.getElementById(`invoiceQRCodeBox_${formattedSeq}`), {
         text: qrText,
@@ -5605,12 +5760,12 @@ async function closeBatchAndPrint() {
     updateFile(currentFileId, f => {
       if(currentMode === 'receiving') {
         f.receivingCheckpoints = f.receivingCheckpoints || [];
-        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, actualDate: actualFieldDate });
+        f.receivingCheckpoints.push({ ts: Date.now(), seq: formattedSeq, tons: roundTons(calculatedTotal), actualDate: actualFieldDate });
       } else {
         const d = f.deliveries.find(x => x.id === currentDeliveryId);
         if(d) {
           d.checkpoints = d.checkpoints || [];
-          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: calculatedTotal, actualDate: actualFieldDate });
+          d.checkpoints.push({ ts: Date.now(), seq: formattedSeq, tons: roundTons(calculatedTotal), actualDate: actualFieldDate });
         }
       }
     });
@@ -5730,7 +5885,7 @@ async function reprintCheckpoint(cpIndex) {
 
   // Generate QR Code inside piContent specifically for the printed invoice
   const hash = generateSecureAuditHash(file.fileNumber, formattedSeq, currCp.tons || 0, currCp.actualDate);
-  const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${(Math.round((currCp.tons || 0) * 100) / 100).toFixed(2)} | Hash: ${hash}`;
+  const qrText = `ONIL_VERIFY | BL: ${file.fileNumber} | Seq: ${formattedSeq} | NetTons: ${roundTons(currCp.tons || 0).toFixed(WEIGHT_DECIMALS)} | Hash: ${hash}`;
   try {
     new QRCode(document.getElementById(`invoiceQRCodeBox_${formattedSeq}`), {
       text: qrText,
@@ -5793,11 +5948,15 @@ function downloadBlob(blob, filename){
     const a = document.createElement('a');
     a.href = url;
     a.download = filename;
+    // target=_blank: احتياط إضافي لبعض المتصفحات (خاصة داخل WebView/إنستغرام/فيسبوك)
+    a.target = '_blank';
+    a.rel = 'noopener';
     document.body.appendChild(a);
     a.click();
+    try { document.body.removeChild(a); } catch(e){}
     // رابط احتياطي دائماً: بعض المتصفحات (خاصة على الهاتف) تمنع التحميل التلقائي
     showDownloadFallback(url, filename);
-    setTimeout(() => { try{ document.body.removeChild(a); }catch(e){} try{ URL.revokeObjectURL(url); }catch(e){} }, 60000);
+    setTimeout(() => { try{ URL.revokeObjectURL(url); }catch(e){} }, 10 * 60 * 1000);
     return true;
   } catch(err){
     console.error(err);
@@ -5821,6 +5980,21 @@ function showDownloadFallback(url, filename){
 function closeDownloadModal(){
   const modal = document.getElementById('downloadModal');
   if(modal) modal.classList.remove('active');
+}
+
+// إعادة محاولة تحميل آخر وصل جهّزه النظام (يُستخدم من زر النافذة الاحتياطية)
+function retryLastDownload(){
+  const link = document.getElementById('downloadModalLink');
+  if(!link || !link.href || link.href === '#' || link.href === window.location.href + '#') return;
+  const a = document.createElement('a');
+  a.href = link.href;
+  a.download = link.getAttribute('download') || 'receipt.pdf';
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  try { document.body.removeChild(a); } catch(e){}
+  showToast('⬇️ تمت إعادة محاولة التحميل — تفقّد مجلد التنزيلات');
 }
 
 // --- FORCE APP UPDATE & CLEAR CACHE ---
@@ -5853,13 +6027,26 @@ function forceAppUpdate() {
   }
 }
 
+// --- تطبيع الوزن المستخدم في الرمز الأمني ---
+// يجب أن يكون مطابقاً تماماً للرقم المطبوع على الوصل (formatTons يعتمد تقريب
+// نصف‑الأعلى)، وإلا رفضت أداة التحقق وصولاً سليماً عند الأوزان المنتهية بـ 5
+// في الخانة الثالثة (مثال: 2.925 تُطبع "2,93" بينما كان الرمز يُحسب على "2.92").
+function normalizeTonsForAudit(v){
+  const raw = (typeof v === 'number') ? v : parseFloat(String(v == null ? '' : v).replace(/,/g, '.'));
+  const n = isFinite(raw) ? raw : 0;
+  const sign = n < 0 ? '-' : '';
+  // نفس دقة العرض الموحدة (3 خانات) حتى يتطابق الرمز مع المطبوع تماماً
+  const r = roundTons(Math.abs(n)).toFixed(WEIGHT_DECIMALS);
+  return sign + r;
+}
+
 // --- SECURE DETERMINISTIC AUDIT HASH GENERATION ---
 function generateSecureAuditHash(fileNumber, seqNum, netWeight, dateStr) {
   const fileNumClean = String(fileNumber).trim().replace(/\s+/g, '');
   const seqClean = String(seqNum).trim();
   // الوزن يُقرَّب لخانتين عشريتين (نفس الرقم المطبوع على الوصل) حتى يتطابق رمز عون الأمن دائماً
   // كما تُطبَّع الفاصلة العشرية العربية (1,38 → 1.38) لتفادي اختلاف الرموز
-  const weightFixed = (Math.round((parseFloat(String(netWeight).replace(/,/g, '.')) || 0) * 100) / 100).toFixed(2);
+  const weightFixed = normalizeTonsForAudit(netWeight);
   const dClean = dateStr ? String(dateStr).trim().replace(/\//g, '-') : new Date().toISOString().substring(0, 10);
   
   // Use a hardcoded internal static salt to ensure the audit verification works without external key dependencies
@@ -5878,7 +6065,8 @@ function generateSecureAuditHash(fileNumber, seqNum, netWeight, dateStr) {
 function runSecurityAuditVerifier() {
   const fileNum = document.getElementById('auditFileNumber').value.trim();
   const seqNum = document.getElementById('auditSeqNumber').value.trim();
-  const netWeight = parseFloat(document.getElementById('auditNetWeight').value) || 0;
+  // عون الأمن ينقل الوزن كما هو مطبوع على الوصل (بفاصلة عشرية: 2,93)
+  const netWeight = parseFloat(String(document.getElementById('auditNetWeight').value).trim().replace(/,/g, '.')) || 0;
   const auditDateVal = document.getElementById('auditDateInput').value || new Date().toISOString().substring(0, 10);
 
   const resultDiv = document.getElementById('auditGeneratedHash');
@@ -7009,12 +7197,34 @@ function installPWA() {
 // عند أول فتح لهذه النسخة: يمسح الكاش وService Worker تلقائياً
 // حتى لا يبقى الجهاز على نسخة قديمة تعتمد على الإنترنت في التصدير
 // =============================================================
-const APP_BUILD_VERSION = '2026-08-21-v4';
+// =============================================================
+// رقم التحديث وتاريخه (يظهران أعلى يمين الشاشة في شريط العنوان)
+// APP_BUILD_VERSION هو معرّف النسخة المستخدم لمسح الكاش التلقائي:
+// تغييره يجعل التطبيق يحدّث نفسه مرة واحدة على أجهزة المستخدمين.
+// =============================================================
+const APP_BUILD_NUMBER = 5;                 // رقم التحديث
+const APP_BUILD_DATE   = '2026-08-24';      // تاريخ التحديث (YYYY-MM-DD)
+const APP_BUILD_VERSION = APP_BUILD_DATE + '-v' + APP_BUILD_NUMBER;
+
+// صياغة التاريخ للطباعة على الشاشة: 2026-08-24 ← 24/08/2026
+function formatBuildDate(iso){
+  const m = String(iso || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  return m ? (m[3] + '/' + m[2] + '/' + m[1]) : String(iso || '—');
+}
+
 function paintVersionBadge(){
-  const b = document.getElementById('appVersionBadge');
-  if(b) b.textContent = APP_BUILD_VERSION;
+  const num  = document.getElementById('appVersionNumber');
+  const date = document.getElementById('appVersionDate');
+  const chip = document.getElementById('appVersionBadge');
+  const label = 'تحديث ' + APP_BUILD_NUMBER + ' — ' + formatBuildDate(APP_BUILD_DATE);
+  if(num)  num.textContent  = 'v' + APP_BUILD_NUMBER;
+  if(date) date.textContent = formatBuildDate(APP_BUILD_DATE);
+  if(chip){
+    chip.setAttribute('title', 'نسخة التطبيق: ' + label + ' (' + APP_BUILD_VERSION + ')');
+    chip.setAttribute('aria-label', label);
+  }
   const t = document.getElementById('toolsVersionText');
-  if(t) t.textContent = APP_BUILD_VERSION;
+  if(t) t.textContent = label;
 }
 function selfHealIfStale(){
   try {
@@ -7525,5 +7735,5 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb30e66c9d86fa',t:'MTc4NzMzMTU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb503d4b26783f',t:'MTc4NzMzMjg3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb30e66c9d86fa',t:'MTc4NzMzMTU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb503d4b26783f',t:'MTc4NzMzMjg3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3051d87eb1cc8f6',t:'MTc4NzYwMzQzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
