@@ -1105,9 +1105,6 @@ tr:hover {
   </div>
   
   <div class="fb-nav-tabs">
-    <button id="tab-fiche" class="fb-tab" onclick="switchView('fiche')" title="بطاقة المخزون">
-      <i class="fa-solid fa-file-invoice"></i>
-    </button>
     <button id="tab-home" class="fb-tab active" onclick="switchView('home')" title="الرئيسية">
       <i class="fa-solid fa-house"></i>
     </button>
@@ -1150,127 +1147,7 @@ tr:hover {
   <!-- ============================================== -->
   <!-- 1. VIEW: HOME (WORKSPACE / ACTIVE OPERATIONS) -->
   <!-- ============================================== -->
-  <style>
-.fiche-card{max-width:860px;margin:12px auto;background:var(--card-current);border:1px solid var(--border-current);border-radius:14px;padding:14px;box-shadow:0 3px 12px rgba(0,0,0,.06);}
-.fiche-head{font-size:17px;font-weight:900;color:var(--fb-blue);margin-bottom:10px;}
-.fiche-info{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:6px;font-size:12px;font-weight:700;background:rgba(47,143,212,.06);border-radius:10px;padding:10px;margin-bottom:10px;color:var(--text-current);}
-.fiche-balance{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px;}
-.fiche-balance span{background:var(--fb-green);color:#fff;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;}
-.fiche-balance span.red{background:var(--fb-red);} .fiche-balance span.amb{background:var(--fb-amber);}
-.fiche-row{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
-.fiche-row input,.fiche-sel{flex:1;min-width:80px;padding:10px;border:1.5px solid var(--border-current);border-radius:9px;font-family:inherit;font-size:14px;background:var(--card-current);color:var(--text-current);}
-.fiche-save{flex:1;padding:12px;border:none;border-radius:10px;background:var(--fb-blue);color:#fff;font-weight:900;font-size:15px;cursor:pointer;font-family:inherit;}
-.fiche-table-wrap{overflow-x:auto;}
-.fiche-table{width:100%;border-collapse:collapse;font-size:12px;color:var(--text-current);}
-.fiche-table th,.fiche-table td{border:1px solid var(--border-current);padding:6px;text-align:center;}
-.fiche-table th{background:rgba(47,143,212,.12);}
-.fiche-table td.in{color:var(--fb-green);font-weight:800;} .fiche-table td.out{color:var(--fb-red);font-weight:800;}
-</style>
-<style>
-.fiche-tabs{margin-inline-start:auto;display:flex;gap:6px;}
-.ft-tab{border:1px solid var(--border-current);background:var(--card-current);color:var(--text-current);border-radius:9px;padding:6px 12px;font-weight:800;font-size:12px;cursor:pointer;font-family:inherit;}
-.ft-tab.active{background:var(--fb-blue);color:#fff;}
-.fld{display:flex;align-items:center;gap:4px;flex:1;min-width:120px;}
-.fld input,.fld .fiche-sel{flex:1;}
-.fld-help{width:26px;height:26px;flex:0 0 26px;border-radius:50%;border:none;background:var(--fb-amber);color:#fff;font-weight:900;font-size:14px;cursor:pointer;line-height:1;}
-.fiche-auto{background:rgba(47,143,212,.06);border-radius:10px;padding:8px;font-size:12px;font-weight:700;color:var(--text-current);}
-</style>
-<style>
-#generalTornBagsInputs,#fichePF,#fichePM{display:none!important;}
-#chromeBar{position:sticky;top:8px;z-index:4000;display:flex;gap:6px;margin:10px auto 0;width:max-content;max-width:94%;
- background:var(--card-current);padding:6px;border-radius:999px;box-shadow:0 6px 20px rgba(0,0,0,.18);}
-.ctab{border:none;border-radius:999px;padding:10px 16px;font-size:13px;font-weight:800;background:transparent;color:var(--text-current);cursor:pointer;font-family:inherit;}
-.ctab.active{background:var(--fb-blue);color:#fff;}
-body.chromeui .fb-navbar{display:none!important;}
-body.chromeui .app-view{display:none!important;}
-body.chromeui .app-view.chrome-active{display:block!important;}
-.all-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-@media(max-width:760px){.all-grid{grid-template-columns:1fr;}}
-.tools-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
-.tools-grid button{padding:14px;border:none;border-radius:12px;background:var(--fb-blue);color:#fff;font-weight:800;font-size:14px;cursor:pointer;font-family:inherit;}
-</style>
-<div id="chromeBar" style="display:none;">
-  <button class="ctab active" data-cv="portal" onclick="chromeTab('portal')">🔍 بوابة الملف</button>
-  <button class="ctab" data-cv="all" onclick="chromeTab('all')">📊 كل المعلومات</button>
-  <button class="ctab" data-cv="tools" onclick="chromeTab('tools')">⚙ الأدوات</button>
-  <span class="ctab" id="chromeVer" style="cursor:default;opacity:.8;"></span>
-</div>
-<div id="view-fiche" class="app-view">
-  <div class="fiche-card">
-    <div class="fiche-head">📇 بطاقة المخزون — FICHE DE STOCK
-      <span class="fiche-tabs">
-        <button id="ftLedgerBtn" class="ft-tab active" onclick="ficheTab('ledger')">📒 السجل</button>
-        <button id="ftOpBtn" class="ft-tab" onclick="ficheTab('op')">✍ تسجيل حركة</button>
-      </span>
-    </div>
-    <div id="ficheHeader" class="fiche-info"></div>
-
-    <!-- ====== الواجهة 1: السجل (يطابق FICHE DE STOCK) ====== -->
-    <div id="ficheLedgerPane">
-      <div id="ficheBalance" class="fiche-balance"></div>
-      <div class="fiche-table-wrap"><table class="fiche-table"><thead><tr>
-        <th>DATE<br>التاريخ</th><th>DESIGNATION / TIERS<br>التعيين والجهة</th><th>REFERENCE DOCUMENT<br>نوع/رقم/تاريخ الوثيقة</th>
-        <th>ENTREE<br>إدخال</th><th>SORTIE<br>إخراج</th><th>STOCK FINAL<br>الرصيد</th>
-      </tr></thead><tbody id="ficheLedger"></tbody></table></div>
-    </div>
-
-    <!-- ====== الواجهة 2: تسجيل حركة (يطابق BON DE RECEPTION / SORTIE) ====== -->
-    <div id="ficheOpPane" style="display:none;">
-      <div class="fiche-row">
-        <span class="fld"><select id="ficheType" class="fiche-sel">
-          <option value="receive">🟢 استلام — BON DE RECEPTION</option>
-          <option value="deliver">🔴 تسليم — BON DE SORTIE</option>
-          <option value="lab_out">🧪 إخراج عينة مخبر</option>
-          <option value="lab_in">🧪 إدخال/إرجاع مخبر</option>
-          <option value="adj">🛠️ تسوية ميدانية</option>
-        </select><button class="fld-help" data-help="نوع الحركة: استلام يدخل الكمية (Entrée)، تسليم يُخرجها (Sortie)، مخبر للعينات، وتسوية لتصحيح الكميات بعد الإغلاق." onclick="showFieldHelp(this)">!</button></span>
-        <span class="fld"><input id="ficheLot" type="text" placeholder="رقم الحصة Lot / التعيين"><button class="fld-help" data-help="رقم الحصة (Lot) المكتوب على الوثيقة، مثل 04856984. يُستخدم لتتبع الكمية وربطها بالرمز الأمني." onclick="showFieldHelp(this)">!</button></span>
-      </div>
-      <div class="fiche-row">
-        <span class="fld"><input id="fichePallets" type="number" min="0" value="0" placeholder="منصات Palettes"><button class="fld-help" data-help="عدد المنصات (Palettes). كل منصة = أكياس المنصة × وزن الكيس. اتركه 0 إن كانت الكمية أكياساً فقط." onclick="showFieldHelp(this)">!</button></span>
-        <span class="fld"><input id="ficheBags" type="number" min="0" value="0" placeholder="أكياس سائبة Sacs"><button class="fld-help" data-help="عدد الأكياس السائبة (Sacs) غير الكاملة لمنصة. تُحسب × وزن الكيس." onclick="showFieldHelp(this)">!</button></span>
-      </div>
-      <div class="fiche-row fiche-auto" id="ficheAuto"></div>
-      <div id="ficheAdv" class="fiche-row" style="display:none;">
-        <span class="fld"><input id="fichePF" type="number" min="0" value="0" placeholder="ممزق PF"><button class="fld-help" data-help="أكياس ممزقة مُرجَعة للمورد (PF). تُخصم من الرصيد حسب وزنها." onclick="showFieldHelp(this)">!</button></span>
-        <span class="fld"><input id="fichePM" type="number" min="0" value="0" placeholder="ممزق PM"><button class="fld-help" data-help="أكياس ممزقة مسلّمة للملبنة (PM). تُخصم من الرصيد حسب وزنها." onclick="showFieldHelp(this)">!</button></span>
-        <span class="fld"><input id="ficheNetW" type="number" step="0.01" value="25" placeholder="وزن صافي/كيس"><button class="fld-help" data-help="الوزن الصافي للكيس من تقرير المخبر (مثال 24.2). يُستخدم لحساب الوزن الفعلي بدل الاسمي." onclick="showFieldHelp(this)">!</button></span>
-        <span class="fld"><input id="ficheReason" type="text" placeholder="ملاحظة Observation"><button class="fld-help" data-help="ملاحظة حرة تُسجل مع الحركة (مثل رقم التقرير أو سبب التسوية)، تظهر في عملة التعيين بالسجل." onclick="showFieldHelp(this)">!</button></span>
-      </div>
-      <div class="fiche-row">
-        <button class="wk-adv-toggle" onclick="var a=document.getElementById('ficheAdv');a.style.display=a.style.display==='none'?'flex':'none';this.textContent=a.style.display==='none'?'+ ممزق/مخبر/ملاحظة':'− إخفاء الخيارات';">+ ممزق/مخبر/ملاحظة</button>
-        <button class="fiche-save" onclick="ficheSave()">💾 تسجيل الحركة</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div id="view-all" class="app-view">
-  <div class="fiche-card"><h3 class="fiche-head">📊 كل المعلومات — المخزن والزبائن</h3>
-    <div class="all-grid">
-      <div><div class="fiche-head" style="font-size:14px;">📦 أرصدة الملفات</div>
-        <div class="fiche-table-wrap"><table class="fiche-table"><thead><tr><th>#</th><th>الملف</th><th>المستلم</th><th>المسلم</th><th>المتاح</th></tr></thead><tbody id="allFiles"></tbody></table></div>
-      </div>
-      <div><div class="fiche-head" style="font-size:14px;">👥 حسابات الزبائن</div>
-        <div class="fiche-table-wrap"><table class="fiche-table"><thead><tr><th>الزبون</th><th>المخصص</th><th>المسلَّم</th><th>المتبقي</th></tr></thead><tbody id="allCustomers"></tbody></table></div>
-      </div>
-    </div>
-  </div>
-</div>
-<div id="view-tools" class="app-view">
-  <div class="fiche-card"><h3 class="fiche-head">⚙ الأدوات والإدارة</h3>
-    <div class="tools-grid">
-      <button onclick="exportAllToExcelActual()">📤 تصدير Excel</button>
-      <button onclick="triggerBackup()">💾 نسخة احتياطية</button>
-      <button onclick="document.getElementById('restoreBackupInput').click()">📥 استرجاع نسخة</button>
-      <button onclick="chromeAdjust()">🛠️ التسويات الميدانية</button>
-      <button onclick="switchToClassic()">🔧 الوضع الكامل (إدارة)</button>
-    </div>
-    <div style="font-size:11px;opacity:.7;margin-top:8px;">أُزيلت: بوابة الأمن، النوتيفيكاشون، وخانات PF/PM. الرمز الأمني يبقى مطبوعاً على الوصل.</div>
-  </div>
-</div>
-
-<div id="view-home" class="app-view active">
+  <div id="view-home" class="app-view active">
     
     <!-- Receive / Deliver Tab Switchers -->
     <div class="tab-switch-container">
@@ -2697,7 +2574,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderAll();
 
   // تنبيه لمرة واحدة بعد تحديث منطق الخصم (لكل إدخال بدل الخصم الرجعي الشامل)
-  if(false){ // أُزيل الممزق كلياً؛ لا حاجة لإشعار منطقه القديم
+  if(!_safeStorage.getItem('torn_per_entry_notice_v2')) {
     _safeStorage.setItem('torn_per_entry_notice_v2', '1');
     setTimeout(() => {
       showAlertModal(`🔄 <b>تحديث منطق خصم الأكياس الممزقة:</b><br><br>أصبح قرار الخصم يُسجَّل <b>مع كل دفعة وقت إدخالها</b> ولا يتغير لاحقاً عند تفعيل أو إلغاء المفتاح العام.<br><br>• المفتاح العام يتحكم فقط في <b>الدفعات الجديدة</b>.<br>• الإدخالات المسجلة سابقاً <b>بدون تفعيل الخصم لن تُخصم تلقائياً</b> بعد الآن.<br>• يمكنك تفعيل أو إلغاء الخصم لأي سجل من عمود <b>"خصم الممزق"</b> في جدول سجل الشحنات.`, "تحديث منطق خصم الممزق", false);
@@ -2711,7 +2588,7 @@ function switchView(viewId) {
   document.querySelectorAll('.app-view').forEach(v => v.classList.remove('active'));
   
   // Update header highlighting
-  const tabIds = { fiche: 'tab-fiche', home: 'tab-home', shipments: 'tab-shipments', stock: 'tab-stock', customers: 'tab-customers', security: 'tab-security', notifications: 'tab-notifications' };
+  const tabIds = { home: 'tab-home', shipments: 'tab-shipments', stock: 'tab-stock', customers: 'tab-customers', security: 'tab-security', notifications: 'tab-notifications' };
   Object.keys(tabIds).forEach(k => {
     const el = document.getElementById(tabIds[k]);
     if(el) {
@@ -3079,9 +2956,7 @@ function syncTornToggleWithActiveFile(){
 
 // --- قرار الخصم يُسجَّل مع كل إدخال وقت تسجيله ولا يتغير لاحقاً بالمفتاح العام ---
 // (إصلاح الخلل: كان الخصم يُطبق بأثر رجعي على كل الإدخالات عند تفعيل المفتاح)
-const REMOVE_TORN = true; // إزالة الممزق من الحسابات مستقبلاً (قرار المستخدم)
 function shouldDeductTorn(entry){
-  if (REMOVE_TORN) return false;
   if(!entry || typeof entry !== 'object') return false; // حماية من البيانات المدمرة
   if(entry && typeof entry.deductTorn === 'boolean') return entry.deductTorn;
   return false; // الإدخالات القديمة (قبل التحديث): لا خصم تلقائي - يمكن تعديلها من عمود "خصم الممزق" في الجدول
@@ -3454,9 +3329,7 @@ function renderAll() {
   const logs = loadLogs();
   document.getElementById('badge-count').textContent = logs.length;
 
-  if(activeView === 'fiche') {
-    renderFiche();
-  } else if(activeView === 'home') {
+  if(activeView === 'home') {
     renderCounters();
     renderSuggestedChips();
     renderShipmentEntriesTable();
@@ -7370,7 +7243,7 @@ function installPWA() {
 // APP_BUILD_VERSION هو معرّف النسخة المستخدم لمسح الكاش التلقائي:
 // تغييره يجعل التطبيق يحدّث نفسه مرة واحدة على أجهزة المستخدمين.
 // =============================================================
-const APP_BUILD_NUMBER = 11;                 // رقم التحديث
+const APP_BUILD_NUMBER = 13;                 // رقم التحديث
 const APP_BUILD_DATE   = '2026-08-30';      // تاريخ التحديث (YYYY-MM-DD)
 const APP_BUILD_VERSION = APP_BUILD_DATE + '-v' + APP_BUILD_NUMBER;
 
@@ -7438,198 +7311,9 @@ function selfHealIfStale(){
 }
 
 // First critical render step immediately parsing scripts, to prevent white-screen delay.
-// ===== بطاقة المخزون Fiche de Stock (طبقة عرض - لا تلمس المنطق) =====
-function ficheQty(e){
-  const parts=[];
-  if(e.pallets) parts.push(e.pallets+' منصة');
-  if(e.bags) parts.push(e.bags+' كيس');
-  return parts.join(' + ')||'—';
-}
-function ficheTab(t){
-  document.getElementById('ficheLedgerPane').style.display = (t==='ledger')?'block':'none';
-  document.getElementById('ficheOpPane').style.display   = (t==='op')?'block':'none';
-  document.getElementById('ftLedgerBtn').classList.toggle('active', t==='ledger');
-  document.getElementById('ftOpBtn').classList.toggle('active', t==='op');
-}
-function showFieldHelp(btn){
-  const name = btn.parentElement.querySelector('input,select');
-  const label = name ? (name.placeholder || name.id) : '';
-  showAlertModal('<b>📌 إرشاد الحقل:</b> '+(btn.getAttribute('data-help')||'')+(label?'<br><small>الحقل: '+label+'</small>':''), 'مساعدة', false);
-}
-let ficheFileId = null;
-// ترقيم تسلسلي للملفات (بحسب ترتيب الإنشاء) + العدد الكلي
-function fileSeq(id){ const i = loadFiles().findIndex(f => f.id === id); return i >= 0 ? i + 1 : 0; }
-function fileCount(){ return loadFiles().length; } // نافذة البطاقة لكل ملف (مستقلة عن الملف النشط عملياتياً)
-function ficheFileChange(v){ ficheFileId = v || null; renderFiche(); }
-function buildFicheMovements(file){
-  const mv=[];
-  ((file.receiving||{}).entries||[]).forEach((e,i)=>mv.push({ts:e.ts,kind:'in',label:'استلام',lot:e.lot,qty:ficheQty(e),w:entryWeight(e,file),ref:'BR / '+(e.truck||''),id:'rec:'+i}));
-  (file.deliveries||[]).forEach(d=>(d.entries||[]).forEach((e,i)=>mv.push({ts:e.ts,kind:'out',label:'تسليم '+(d.customerName||''),lot:e.lot,qty:ficheQty(e),w:entryWeight(e,file),ref:'BS / '+(e.truck||''),id:'del:'+d.id+':'+i})));
-  ((file.labTests?.entries||file.labEntries)||[]).forEach((e,i)=>mv.push({ts:e.ts,kind:e.type==='in'?'in':'out',label:e.type==='in'?'إرجاع مخبر':'عينة مخبر',lot:e.lot,qty:ficheQty(e),w:entryWeight(e,file),ref:'LAB / '+(e.reason||''),id:'lab:'+i}));
-  (file.adjustments||[]).forEach((a2,i)=>{
-    const w=adjustmentWeight(a2,file);
-    const sign=(a2.type==='add'||a2.type==='untorn')?1:(a2.type==='move'?0:-1);
-    mv.push({ts:a2.ts,kind:sign>=0?'in':'out',label:'تسوية '+({add:'زيادة',remove:'نقصان',torn:'ممزق',untorn:'إلغاء ممزق',move:'نقل'}[a2.type]||''),lot:a2.lot,qty:ficheQty(a2),w:Math.abs(w)*(sign===0?0:1),ref:'ADJ / '+(a2.reason||''),id:'adj:'+i});
-  });
-  mv.sort((x,y)=>x.ts-y.ts);
-  let run=0;
-  mv.forEach(m=>{ run += (m.kind==='in'? +m.w : -m.w); m.stock=Math.max(0,run); });
-  return mv;
-}
-function ficheEdit(id){
-  const file=getFile(ficheFileId||currentFileId); if(!file) return;
-  const [kind,a,b2]=id.split(':');
-  let cur=null;
-  if(kind==='rec') cur=(file.receiving||{}).entries?.[+a];
-  else if(kind==='del'){ const d=(file.deliveries||[]).find(x=>x.id===a); cur=d?d.entries[+b2]:null; }
-  else if(kind==='lab') cur=((file.labTests?.entries||file.labEntries)||[])[+a];
-  else if(kind==='adj') cur=(file.adjustments||[])[+a];
-  if(!cur){ showToast('تعذر العثور على الحركة'); return; }
-  const np = prompt('✏️ منصات (Palettes):', cur.pallets||0); if(np==null) return;
-  const nb = prompt('✏️ أكياس (Sacs):', cur.bags||0); if(nb==null) return;
-  const nl = prompt('✏️ رقم الحصة (Lot):', cur.lot||''); if(nl==null) return;
-  const doDel = confirm(' حذف هذه الحركة نهائياً؟\n(اضغط «إلغاء» للحفظ دون حذف)');
-  const fid=file.id;
-  updateFile(fid, f=>{
-    let e=null;
-    if(kind==='rec') e=(f.receiving||{}).entries?.[+a];
-    else if(kind==='del'){ const d=(f.deliveries||[]).find(x=>x.id===a); e=d?d.entries[+b2]:null; }
-    else if(kind==='lab') e=((f.labTests?.entries||f.labEntries)||[])[+a];
-    else if(kind==='adj'){ if(doDel){ f.adjustments.splice(+a,1); return; } e=(f.adjustments||[])[+a]; }
-    if(!e) return;
-    if(doDel){
-      if(kind==='rec') f.receiving.entries.splice(+a,1);
-      else if(kind==='del'){ const d=f.deliveries.find(x=>x.id===a); d.entries.splice(+b2,1); }
-      else if(kind==='lab'){ (f.labTests.entries).splice(+a,1); }
-    } else { e.pallets=+np||0; e.bags=+nb||0; if(nl) e.lot=nl; }
-  });
-  showToast(doDel?'🗑 تم حذف الحركة':'✏️ تم تعديل الحركة');
-  renderFiche(); renderAll();
-}
-function renderFiche(){
-  const file=getFile(ficheFileId||currentFileId);
-  const head=document.getElementById('ficheHeader');
-  const bal=document.getElementById('ficheBalance');
-  const led=document.getElementById('ficheLedger');
-  const auto=document.getElementById('ficheAuto');
-  // منتقي نافذة الملف
-  let sel=document.getElementById('ficheFileSelect');
-  if(!sel){ sel=document.createElement('select'); sel.id='ficheFileSelect'; sel.className='fiche-sel'; sel.style.cssText='max-width:220px;margin-bottom:8px;'; sel.onchange=e=>ficheFileChange(e.target.value); head.parentElement.insertBefore(sel, head); }
-  sel.innerHTML = loadFiles().map((f,i)=>`<option value="${f.id}" ${f.id===(ficheFileId||currentFileId)?'selected':''}>#${i+1} 📁 ${escapeHtml(f.fileNumber)}</option>`).join('');
-  if(!file){ head.innerHTML='<b>لا يوجد ملف — أنشئ ملفاً من الأدوات.</b>'; bal.innerHTML=''; led.innerHTML=''; if(auto)auto.innerHTML=''; return; }
-  const st=getFileRealStocks(file);
-  head.innerHTML =
-    `<span>ملف رقم: <b>#${fileSeq(file.id)} / ${fileCount()}</b></span>`+
-    `<span>Dépôt: <b>${escapeHtml(file.warehouse||'سعيدة')}</b></span>`+
-    `<span>BL: <b>${escapeHtml(file.fileNumber)}</b></span>`+
-    `<span>NAVIRE: <b>${escapeHtml(file.vessel||'—')}</b></span>`+
-    `<span>FOURNISSEUR: <b>${escapeHtml(file.supplier||'—')}</b></span>`+
-    `<span>CONTRAT: <b>${escapeHtml(file.contractNumber||'—')}</b></span>`+
-    `<span>البودرة: <b>${escapeHtml(file.powderType||'—')}</b></span>`+
-    `<span>وزن الكيس: <b>${file.bagWeight||25} كغ</b></span>`+
-    `<span>أكياس المنصة: <b>${file.bagsPerPallet||56}</b></span>`;
-  if(auto) auto.innerHTML = `<span>FOURNISSEUR: ${escapeHtml(file.supplier||'—')}</span><span>NAVIRE: ${escapeHtml(file.vessel||'—')}</span><span>CONTRAT: ${escapeHtml(file.contractNumber||'—')}</span><span>BL: ${escapeHtml(file.fileNumber)}</span>`;
-  bal.innerHTML =
-    `<span>المستلم ${formatTons(st.rec)}</span>`+
-    `<span class="red">المسلم ${formatTons(st.del)}</span>`+
-    `<span class="red">الممزق ${formatTons(st.torn)}</span>`+
-    `<span class="amb">مخبر ${formatTons(st.labOut)}/${formatTons(st.labIn)}</span>`+
-    `<span>STOCK المتاح ${formatTons(st.available)}</span>`;
-  led.innerHTML = buildFicheMovements(file).map(m=>{
-    const d=new Date(m.ts);
-    return `<tr style="cursor:pointer" onclick="ficheEdit('${m.id}')" title="اضغط للتعديل/الحذف"><td>${d.toLocaleDateString('ar-DZ')}<br><small>${d.toLocaleTimeString('ar-DZ',{hour:'2-digit',minute:'2-digit'})}</small></td>`+
-      `<td>${escapeHtml(m.label)} — ${escapeHtml(m.lot)}<br><small>${escapeHtml(m.qty)}</small></td>`+
-      `<td><small>${escapeHtml(m.ref||'')}</small></td>`+
-      `<td class="in">${m.kind==='in'?formatTons(m.w):''}</td>`+
-      `<td class="out">${m.kind==='out'?formatTons(m.w):''}</td>`+
-      `<td><b>${formatTons(m.stock)}</b></td></tr>`;
-  }).join('') || '<tr><td colspan="6">لا حركات بعد</td></tr>';
-}
-function ficheSave(){
-  const t=document.getElementById('ficheType').value;
-  const lot=document.getElementById('ficheLot').value.trim();
-  const pallets=+document.getElementById('fichePallets').value||0;
-  const bags=+document.getElementById('ficheBags').value||0;
-  document.getElementById('ficheAdjType').style.display = (t==='adj')?'block':'none';
-  if(!lot){ showToast('⚠️ أدخل رقم الحصة!'); return; }
-  if(t==='receive'||t==='deliver'){
-    setOperationMode(t==='receive'?'receiving':'delivery', true);
-    document.getElementById('quickLotNumber').value=lot;
-    document.getElementById('opPalletsCount').value=pallets;
-    document.getElementById('opLooseBagsCount').value=bags;
-    addShipmentBatch();
-  } else if(t==='lab_out'||t==='lab_in'){
-    document.getElementById('labTypeSelect').value=(t==='lab_in'?'in':'out');
-    document.getElementById('labLotNumber').value=lot;
-    document.getElementById('labPalletsCount').value=pallets;
-    document.getElementById('labBagsCount').value=bags||1;
-    const nw=parseFloat(document.getElementById('ficheNetW').value); if(nw>0) document.getElementById('labNetWeightPerBag').value=nw;
-    addLabTestEntry();
-  } else {
-    document.getElementById('adjTypeSelect').value=document.getElementById('ficheAdjType').value;
-    document.getElementById('adjLotNumber').value=lot;
-    document.getElementById('adjPalletsCount').value=pallets;
-    document.getElementById('adjBagsCount').value=bags;
-    const rs=document.getElementById('ficheReason').value; if(rs) document.getElementById('adjReason').value=rs;
-    addAdjustment();
-  }
-  setTimeout(()=>{ renderFiche(); renderAll(); }, 700);
-}
-document.addEventListener('change',e=>{ if(e.target&&e.target.id==='ficheType'){ document.getElementById('ficheAdjType').style.display=(e.target.value==='adj')?'block':'none'; } });
-
-// ===== واجهة الكروم (تبويبات عائمة) =====
-function chromeTab(v){
-  document.querySelectorAll('.ctab').forEach(b=>b.classList.toggle('active', b.dataset.cv===v));
-  const map={portal:'view-fiche', all:'view-all', tools:'view-tools'};
-  ['view-fiche','view-all','view-tools'].forEach(id=>{
-    document.getElementById(id).classList.toggle('chrome-active', id===map[v]);
-  });
-  if(v==='portal') renderFiche();
-  if(v==='all') renderAllView();
-}
-function renderAllView(){
-  const list=loadFiles();
-  document.getElementById('allFiles').innerHTML = list.map((f,i)=>{
-    const st=getFileRealStocks(f);
-    return `<tr><td>#${i+1}</td><td>${escapeHtml(f.fileNumber)}</td><td>${formatTons(st.rec)}</td><td>${formatTons(st.del)}</td><td><b>${formatTons(st.available)}</b></td></tr>`;
-  }).join('') || '<tr><td colspan="5">لا ملفات</td></tr>';
-  const cm={};
-  list.forEach(f=>{(f.deliveries||[]).forEach(d=>{
-    const pw=palletWeight(f);
-    let del=0;(d.entries||[]).forEach(e=>{del+= e.bags? e.bags*parseFloat(f.bagWeight)/1000 : pw;});
-    if(!cm[d.customerName]) cm[d.customerName]={alloc:0,del:0};
-    cm[d.customerName].alloc += (parseFloat(d.targetTons)||0);
-    cm[d.customerName].del += del;
-  });});
-  document.getElementById('allCustomers').innerHTML = Object.entries(cm).map(([n,v])=>
-    `<tr><td>${escapeHtml(n)}</td><td>${formatTons(v.alloc)}</td><td>${formatTons(v.del)}</td><td><b>${formatTons(Math.max(0,v.alloc-v.del))}</b></td></tr>`
-  ).join('') || '<tr><td colspan="4">لا زبائن</td></tr>';
-}
-function switchToClassic(){
-  _safeStorage.setItem('onil_chrome','off');
-  document.body.classList.remove('chromeui');
-  document.getElementById('chromeBar').style.display='none';
-  document.querySelectorAll('.app-view').forEach(v=>v.classList.remove('chrome-active'));
-  switchView('home'); renderAll();
-  showToast('🔧 تم التحويل للوضع الكامل (الإدارة).');
-}
-function chromeAdjust(){ switchToClassic(); setTimeout(()=>{ const a=document.getElementById('adjustmentsControls'); if(a) a.style.display='block'; },300); }
-function initChrome(){
-  const on = (_safeStorage.getItem('onil_chrome')||'on')==='on';
-  if(on){
-    document.body.classList.add('chromeui');
-    document.getElementById('chromeBar').style.display='flex';
-    var cv=document.getElementById('chromeVer'); if(cv) cv.textContent='v'+APP_BUILD_NUMBER+' · '+formatBuildDate(APP_BUILD_DATE);
-    chromeTab('portal');
-  } else {
-    document.getElementById('chromeBar').style.display='none';
-  }
-}
-
 selfHealIfStale();
 renderAll();
 checkForServerUpdate();
-initChrome();
 
 // Register Service Worker for strict Offline PWA support
 if ('serviceWorker' in navigator) {
@@ -8093,5 +7777,5 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb30e66c9d86fa',t:'MTc4NzMzMTU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb503d4b26783f',t:'MTc4NzMzMjg3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a336a4fe8d7ea4a9',t:'MTc4ODEyMjc4Mg=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb30e66c9d86fa',t:'MTc4NzMzMTU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb503d4b26783f',t:'MTc4NzMzMjg3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
