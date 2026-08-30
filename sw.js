@@ -1,40 +1,26 @@
-/* ============================================================
-   sw.js - حاسبة الحصص ديوان الحليب
-   استراتيجية: الشبكة أولاً (Network-First)
-   - عند توفر الإنترنت: يحمّل النسخة الأحدث دائماً ويحدّث الكاش
-   - عند انقطاعه: يخدم آخر نسخة مخزنة (يعمل أوفلاين)
-   تحديث: تغيير رقم الإصدار أدناه يجبر الأجهزة على تحديث كاشها
-   ============================================================ */
-const CACHE_NAME = 'lots-calc-v20260821-v3';
-
-self.addEventListener('install', (e) => {
+/* Service Worker — تخزين مؤقت للعمل أوفلاين (cache-first مع تعبئة من الشبكة) */
+const CACHE = 'onil-lots-v11'; // رُفع الرقم لإبطال التخزين المؤقت القديم بعد إصلاح التذييل
+const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
+self.addEventListener('install', e => {
+  e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
   self.skipWaiting();
 });
-
-self.addEventListener('activate', (e) => {
-  e.waitUntil(
-    caches.keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k))))
-      .then(() => self.clients.claim())
-  );
+self.addEventListener('activate', e => {
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))));
+  self.clients.claim();
 });
-
-self.addEventListener('fetch', (e) => {
-  const req = e.request;
-  if (req.method !== 'GET') return;
-
-  // الشبكة أولاً
+self.addEventListener('fetch', e => {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    fetch(req)
-      .then((res) => {
+    caches.match(e.request).then(cached =>
+      cached || fetch(e.request).then(res => {
         try {
           const copy = res.clone();
-          caches.open(CACHE_NAME).then((c) => c.put(req, copy)).catch(() => {});
+          if (res.ok && new URL(e.request.url).origin === self.location.origin)
+            caches.open(CACHE).then(c => c.put(e.request, copy));
         } catch (err) {}
         return res;
-      })
-      .catch(() =>
-        caches.match(req).then((m) => m || caches.match('./index.html'))
-      )
+      }).catch(() => caches.match('./index.html'))
+    )
   );
 });
