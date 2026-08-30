@@ -3031,18 +3031,38 @@ function getLotAvailable(file, lot){
 
 // --- دالة موحدة لتجميع إدخالات الجلسة الجارية (مع دمج المخبر مرة واحدة فقط) ---
 // تمنع أي ازدواج أو تداخل بين الإغلاق والأرشفة وإعادة الطباعة - تُستخدم في كل مكان
+// وزن جلسة موقَّع: المخبر إخراج يخصم، الإدخال يضيف، التسويات حسب نوعها
+function sessionWeight(e, file){
+  if(!e || typeof e !== 'object') return 0;
+  if(e.kind === 'adjustment'){
+    const w = adjustmentWeight(e, file);
+    switch(e.type){
+      case 'add':    return w;
+      case 'remove': return -w;
+      case 'torn':   return -w;
+      case 'untorn': return w;
+      case 'move':   return 0;
+      default:       return 0;
+    }
+  }
+  const w = entryWeight(e, file);
+  if(e.type === 'out') return -w;  // عينة مخبر مُخرَجة = خصم
+  if(e.type === 'in')  return +w;  // إرجاع مخبر = إضافة
+  return +w;
+}
+
 function collectCloseEntries(file, mode, deliveryId){
   let entries = [];
   if(mode === 'receiving') {
     entries = ((file.receiving || {}).entries || []).slice();
-    const labIn = (file.labTests?.entries || file.labEntries || []).filter(e => e.type === 'in');
-    entries = entries.concat(labIn);
   } else {
     const d = (file.deliveries || []).find(x => x.id === deliveryId);
     entries = d ? (d.entries || []).slice() : [];
-    const labOut = (file.labTests?.entries || file.labEntries || []).filter(e => e.type === 'out');
-    entries = entries.concat(labOut);
   }
+  // دمج كل عمليات المخبر (إدخالاً وإخراجاً) لكلتا الحالتين
+  entries = entries.concat((file.labTests?.entries || file.labEntries || []).slice());
+  // دمج التسويات الميدانية موسومة كـ adjustment حتى تظهر وتُحتسب
+  entries = entries.concat((file.adjustments || []).map(a => Object.assign({}, a, { kind: 'adjustment' })));
   const checkpoints = (mode === 'receiving') ? (file.receivingCheckpoints || []) : (((file.deliveries || []).find(d => d.id === deliveryId) || {}).checkpoints || []);
   const lastCheckpointTs = checkpoints.length > 0 ? Math.max(...checkpoints.map(c => c.ts)) : 0;
   return entries.filter(e => e.ts > lastCheckpointTs);
@@ -4374,7 +4394,7 @@ function archiveCurrentBatch() {
     return;
   }
 
-  const grossTotal = currentSessionEntries.reduce((s,e) => s + entryWeight(e, file), 0);
+  const grossTotal = currentSessionEntries.reduce((s,e) => s + sessionWeight(e, file), 0);
   let tornWeightDeduction = 0;
   if(currentMode === 'receiving') {
     currentSessionEntries.forEach(e => {
@@ -5348,21 +5368,22 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     displayEntries = entries.filter(e => e && e.ts > lastCheckpointTs);
   }
 
-  const tally = getLotsTally(displayEntries, file);
+  const physicalEntries = displayEntries.filter(e => e && !e.kind && e.type !== 'in' && e.type !== 'out');
+  const tally = getLotsTally(physicalEntries, file);
   const pw = palletWeight(file);
   const bagW = (parseFloat(file.bagWeight) || 25) / 1000;
 
   let totalPF = 0;
   let totalPM = 0;
 
-  const tableRows = Object.keys(tally).sort().map(lot => {
+  let tableRows = Object.keys(tally).sort().map(lot => {
     const t = tally[lot];
     totalPF += t.pf;
     totalPM += t.pm;
     const countStr = `${t.pallets} منصة ${t.looseBags > 0 ? '+ ' + t.looseBags + ' أكياس سائبة' : ''}`;
     // احسب وزن الحصة من إدخالاتها الفعلية لضمان استخدام الوزن الصافي لفحوصات المخبر بدل الوزن الاسمي
     let weight = 0;
-    displayEntries.filter(e => e && e.lot === lot).forEach(e => { weight += entryWeight(e, file); });
+    displayEntries.filter(e => e && e.lot === lot).forEach(e => { weight += sessionWeight(e, file); });
     
     let tornCountForLot = t.pf + t.pm;
     if (tornCountForLot > 0) {
@@ -5391,7 +5412,14 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     `;
   }).join('') || `<tr><td colspan="3">لا توجد حصص مسجلة في هذا الوصل</td></tr>`;
 
-  const calculatedTotal = displayEntries.reduce((s,e) => s + entryWeight(e, file), 0);
+  // صفوف عمليات المخبر والتسويات الميدانية ضمن الجلسة (حتى لا يخرج الوصل فارغاً)
+  const opTypeNames = { add:'تسوية زيادة', remove:'تسوية نقصان', torn:'تحويل لممزق', untorn:'إلغاء ممزق', move:'نقل بين حصص' };
+  tableRows += displayEntries.filter(e => e && (e.kind === 'adjustment' || e.type === 'in' || e.type === 'out')).map(e => {
+    const label = (e.kind === 'adjustment') ? (opTypeNames[e.type] || e.type) : (e.type === 'in' ? 'إرجاع مخبر' : 'عينة مخبر مُخرَجة');
+    return `<tr><td style="font-size:12px;">${escapeHtml(e.lot||'—')}</td><td style="font-size:11px;">${label}${e.reason ? ' — ' + escapeHtml(e.reason) : ''}</td><td>${formatTons(sessionWeight(e, file))}</td></tr>`;
+  }).join('');
+
+  const calculatedTotal = displayEntries.reduce((s,e) => s + sessionWeight(e, file), 0);
   const totalTornBags = totalPF + totalPM;
   let tornWeightDeduction = 0;
   displayEntries.forEach(e => {
@@ -5522,7 +5550,7 @@ function buildInvoiceReceiptHTML(file, entries, title, numberSeq, isDraft, close
     
     <!-- Secure Audit Hash for Tamper Prevention -->
     <div style="margin-top: 15px; text-align: center; font-size: 11px; font-family: monospace; color: #333; border-top: 1px dashed #C7D8E8; padding-top: 5px; direction: ltr;">
-      🔒 الرمز الأمني للتحقق (Secure Verification Code): <span style="font-weight: 900; color: #000; font-size: 13px; border: 1px solid #000; padding: 2px 6px; border-radius: 4px; background-color: #f2f2f2 !important;">${generateSecureAuditHash(file.fileNumber, numberSeq, finalNetWeight)}</span>
+      🔒 الرمز الأمني للتحقق (Secure Verification Code): <span style="font-weight: 900; color: #000; font-size: 13px; border: 1px solid #000; padding: 2px 6px; border-radius: 4px; background-color: #f2f2f2 !important;">${generateSecureAuditHash(file.fileNumber, numberSeq, finalNetWeight, closedDateStr)}</span>
     </div>
     
     <!-- Added Official EPIC ONIL Footer Details safely as requested -->
@@ -5703,7 +5731,7 @@ async function closeBatchAndPrint() {
     return;
   }
 
-  const grossTotal = currentSessionEntries.reduce((s,e) => s + entryWeight(e, file), 0);
+  const grossTotal = currentSessionEntries.reduce((s,e) => s + sessionWeight(e, file), 0);
   let tornWeightDeduction = 0;
   if(currentMode === 'receiving') {
     currentSessionEntries.forEach(e => {
@@ -7735,5 +7763,5 @@ function(t){t.__bidiEngine__=t.prototype.__bidiEngine__=function(t){var r,n,i,a,
 
 </script>
 
-<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb30e66c9d86fa',t:'MTc4NzMzMTU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb503d4b26783f',t:'MTc4NzMzMjg3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a3051d87eb1cc8f6',t:'MTc4NzYwMzQzMQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+<script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27626f74d2409ad',t:'MTc4NjEwNDM1NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a27702cfe9fcad53',t:'MTc4NjExMzM1OQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb30e66c9d86fa',t:'MTc4NzMzMTU5NQ=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a2eb503d4b26783f',t:'MTc4NzMzMjg3OA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script><script>(function(){function c(){var b=a.contentDocument||(a.contentWindow&&a.contentWindow.document);if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'a33498258860fd05',t:'MTc4ODEwMTI4NA=='};var a=document.createElement('script');a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
 </html>
