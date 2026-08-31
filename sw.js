@@ -1,5 +1,5 @@
 /* Service Worker — تخزين مؤقت للعمل أوفلاين (cache-first مع تعبئة من الشبكة) */
-const CACHE = 'onil-lots-v13'; // رُفع الرقم لإبطال التخزين المؤقت القديم بعد إصلاح التذييل
+const CACHE = 'onil-lots-v15'; // رُفع الرقم لإبطال التخزين المؤقت القديم بعد إصلاح التذييل
 const CORE = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => c.addAll(CORE)));
